@@ -1,0 +1,6 @@
+{
+  "name": "ZAKA - E-Hailing Platform",
+  "description": "Next-generation e-hailing web platform connecting passengers, drivers, and fleet administrators.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

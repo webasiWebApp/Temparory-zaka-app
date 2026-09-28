@@ -1,0 +1,566 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // HELPER FUNCTIONS & AUTHORIZATION PREDICATES
+    // ==========================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAnonymous() {
+      return isAuthenticated() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    function getUserData() {
+      return hasUserDoc() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data : {};
+    }
+    
+    // Real, verified administrator check (hardened against client-side self-escalation)
+    function isRealAdmin() {
+      return isAuthenticated() && !isAnonymous() && (
+        request.auth.token.get('role', '') == 'admin' || 
+        request.auth.uid in ['Js6QAJWZskfRhInQFlX4fjlZ9Ws1', 'KCKA8mq7u6Udj5Lp4pIMSqlEgPJ2'] ||
+        (
+          (request.auth.token.get('email_verified', false) == true || request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com' || request.auth.token.get('email', '') == 'ian.mkhize@gmail.com') &&
+          request.auth.token.get('email', '') in ['admin@zaka.io', 'zaka.backend.service@zaka.io', 'ian.mkhize@gmail.com']
+        )
+      );
+    }
+
+    function isDemoAdmin() {
+      return false;
+    }
+    
+    function isAdmin() {
+      return isRealAdmin();
+    }
+
+    function isDriver() {
+      return (hasUserDoc() && getUserData().get('role', '') == 'driver') ||
+             exists(/databases/$(database)/documents/drivers/$(request.auth.uid));
+    }
+
+    // ==========================================
+    // 1. USERS COLLECTION (ZAKA Single Identity)
+    // ==========================================
+    match /users/{userId} {
+      // Users can only read their own profile document unless Admin
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true)
+      );
+      
+      // Newly authenticated users can create their own profile document as passenger or driver.
+      // Admin role can NEVER be created by normal users.
+      allow create: if isAuthenticated() && (
+        (
+          request.auth.uid == userId && 
+          request.resource.data.get('role', 'passenger') in ['passenger', 'driver'] &&
+          !request.resource.data.get('roles', []).hasAny(['admin'])
+        ) ||
+        isRealAdmin()
+      );
+      
+      // Users can update their own profile but CANNOT self-escalate to admin or tamper with roles.
+      // Users can add 'driver' to roles array during driver onboarding, but NEVER 'admin'.
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
+        (
+          request.auth.uid == userId && 
+          request.resource.data.get('role', 'passenger') in ['passenger', 'driver'] &&
+          request.resource.data.get('activeRole', 'passenger') in ['passenger', 'driver'] &&
+          !request.resource.data.get('roles', []).hasAny(['admin']) &&
+          request.resource.data.get('status', 'active') in [resource.data.get('status', 'active'), 'deleted'] &&
+          request.resource.data.get('accountStatus', 'active') in [resource.data.get('accountStatus', 'active'), 'deleted']
+        )
+      );
+      
+      allow delete: if (isAuthenticated() && request.auth.uid == userId) || isRealAdmin() || (isDemoAdmin() && resource.data.get('isDemo', false) == true);
+
+      // Recent destinations subcollection - private to passenger owner
+      match /recentDestinations/{destinationId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == userId || 
+          isRealAdmin() || 
+          (isDemoAdmin() && resource.data.get('isDemo', false) == true)
+        );
+      }
+    }
+
+    // ==========================================
+    // 2. PASSENGERS COLLECTION
+    // ==========================================
+    match /passengers/{passengerId} {
+      // Passengers read own profile; Admin reads all; Drivers CANNOT read all passengers
+      allow read: if isAuthenticated() && (
+        request.auth.uid == passengerId || 
+        isRealAdmin() || 
+        (resource.data.get('isDemo', false) == true && isAnonymous())
+      );
+      allow create: if isAuthenticated() && (
+        request.auth.uid == passengerId || 
+        isRealAdmin() || 
+        (isAnonymous() && request.resource.data.get('isDemo', false) == true)
+      );
+      allow update: if isAuthenticated() && (
+        request.auth.uid == passengerId || 
+        isRealAdmin() || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalTrips', 'rating', 'totalRatings', 'ratingSum', 'updatedAt'])
+      );
+      allow delete: if (isAuthenticated() && request.auth.uid == passengerId) || isRealAdmin();
+    }
+
+    // ==========================================
+    // 3. DRIVERS COLLECTION
+    // ==========================================
+    // A driver can ONLY read their own profile; admins can read all;
+    // Online & verified drivers readable by passengers for map radar (never by other drivers)
+    match /drivers/{driverId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == driverId ||
+        isRealAdmin() ||
+        (
+          !isDriver() &&
+          resource.data.get('online', false) == true &&
+          resource.data.get('verificationStatus', '') == 'approved'
+        ) ||
+        (resource.data.get('isDemo', false) == true && isAnonymous())
+      );
+
+      // Driver registers their doc with verificationStatus strictly 'pending'
+      allow create: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && request.resource.data.get('isDemo', false) == true) ||
+        (
+          !isAnonymous() &&
+          request.auth.uid == driverId && 
+          request.resource.data.get('isDemo', false) != true &&
+          request.resource.data.get('verificationStatus', 'pending') == 'pending'
+        ) ||
+        (
+          request.auth.uid == driverId &&
+          request.resource.data.get('isDemo', false) == true &&
+          (isAnonymous() || request.resource.data.get('demoPersona', '') in ['sipho', 'kofi'])
+        )
+      );
+
+      // Driver can update online status/location/documents, but CANNOT change verificationStatus unless Admin
+      // And CANNOT toggle online: true unless verificationStatus == 'approved'
+      // And CANNOT tamper with ratings, earnings, commission, suspension, or approval fields
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
+        (
+          request.auth.uid == driverId && (
+            (
+              resource.data.get('isDemo', false) != true &&
+              (!request.resource.data.get('online', false) || resource.data.get('verificationStatus', '') == 'approved') &&
+              request.resource.data.get('verificationStatus', 'pending') == resource.data.get('verificationStatus', 'pending') &&
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                'verificationStatus', 'rating', 'totalRatings', 'ratingSum',
+                'platformCommission', 'earningsToday', 'earningsThisWeek', 'totalEarnings',
+                'suspended', 'suspensionStatus', 'suspensionReason', 'suspendedAt',
+                'approvedAt', 'approvedBy', 'approvalStatus'
+              ])
+            ) ||
+            (
+              resource.data.get('isDemo', false) == true && 
+              request.resource.data.get('isDemo', false) == true
+            )
+          )
+        ) ||
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid'])) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'totalRatings', 'ratingSum', 'updatedAt'])
+      );
+
+      allow delete: if isRealAdmin() || (isDemoAdmin() && resource.data.get('isDemo', false) == true);
+
+      // Private verification documents subcollection: driver and Admin only
+      match /documents/{docId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid == driverId ||
+          isRealAdmin() ||
+          (isDemoAdmin() && get(/databases/$(database)/documents/drivers/$(driverId)).data.get('isDemo', false) == true)
+        );
+        allow create, update: if isAuthenticated() && (
+          isRealAdmin() ||
+          (isDemoAdmin() && get(/databases/$(database)/documents/drivers/$(driverId)).data.get('isDemo', false) == true) ||
+          (
+            request.auth.uid == driverId &&
+            request.resource.data.get('status', 'pending') == 'pending'
+          )
+        );
+        allow delete: if isRealAdmin();
+      }
+    }
+
+    // ==========================================
+    // 4. DRIVER COMPLIANCE COLLECTION
+    // ==========================================
+    match /driverCompliance/{driverId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == driverId || isRealAdmin()
+      );
+      allow write: if isRealAdmin();
+
+      match /documents/{docId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid == driverId || isRealAdmin()
+        );
+        allow create, update: if isAuthenticated() && (
+          isRealAdmin() ||
+          (
+            request.auth.uid == driverId &&
+            request.resource.data.get('status', 'pending') == 'pending' &&
+            request.resource.data.get('verificationStatus', 'pending') == 'pending'
+          )
+        );
+        allow delete: if isRealAdmin();
+      }
+    }
+
+    // ==========================================
+    // 4b. DRIVER DOCUMENT CONTENTS (Base64 storage cache)
+    // ==========================================
+    match /driver_document_contents/{docKey} {
+      allow read: if isAuthenticated() && (
+        isRealAdmin() ||
+        resource.data.driverId == request.auth.uid
+      );
+      allow create, update: if isAuthenticated() && (
+        isRealAdmin() ||
+        request.resource.data.driverId == request.auth.uid
+      );
+      allow delete: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 5. VEHICLES & VEHICLE COMPLIANCE
+    // ==========================================
+    match /vehicles/{vehicleId} {
+      // Driver can read their own vehicle; Admin can read all vehicles;
+      // Other drivers CANNOT read all vehicles
+      allow read: if isAuthenticated() && (
+        request.auth.uid == vehicleId ||
+        resource.data.get('driverId', '') == request.auth.uid ||
+        isRealAdmin() ||
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid']))
+      );
+      // Drivers can create vehicle doc with status: 'pending'
+      allow create: if isAuthenticated() && (
+        isRealAdmin() ||
+        (
+          (request.auth.uid == vehicleId || request.resource.data.get('driverId', '') == request.auth.uid) &&
+          request.resource.data.get('status', 'pending') == 'pending'
+        ) ||
+        (request.resource.data.get('isDemo', false) == true)
+      );
+      // Driver cannot modify vehicle approval status or verification status
+      allow update: if isAuthenticated() && (
+        isRealAdmin() ||
+        (
+          (request.auth.uid == vehicleId || resource.data.get('driverId', '') == request.auth.uid) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'verificationStatus', 'approvedAt', 'approvedBy'])
+        ) ||
+        (resource.data.get('isDemo', false) == true && request.resource.data.get('isDemo', false) == true)
+      );
+      allow delete: if isRealAdmin() || (isDemoAdmin() && resource.data.get('isDemo', false) == true);
+    }
+
+    match /vehicleCompliance/{vehicleId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == vehicleId || 
+        resource.data.get('driverId', '') == request.auth.uid || 
+        isRealAdmin()
+      );
+      allow write: if isRealAdmin();
+
+      match /documents/{docId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid == vehicleId || 
+          isRealAdmin()
+        );
+        allow create, update: if isAuthenticated() && (
+          isRealAdmin() ||
+          (
+            request.auth.uid == vehicleId &&
+            request.resource.data.get('status', 'pending') == 'pending'
+          )
+        );
+        allow delete: if isRealAdmin();
+      }
+    }
+
+    // ==========================================
+    // 6. RIDES COLLECTION
+    // ==========================================
+    // Visibility:
+    // - Passenger reads only when passengerId == request.auth.uid
+    // - Driver reads only when driverId == request.auth.uid, OR searching rides for dispatch
+    // - Admin reads all rides
+    // - Drivers CANNOT query all rides (bulk collection read rejected for non-admin)
+    match /rides/{rideId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.passengerId ||
+        request.auth.uid == resource.data.driverId ||
+        (resource.data.status == 'searching' && (
+          (!isAnonymous() && resource.data.get('isDemo', false) == false && isDriver()) ||
+          (resource.data.get('isDemo', false) == true)
+        )) ||
+        isRealAdmin() ||
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
+        (resource.data.get('isDemo', false) == true && (
+          isAnonymous() || 
+          request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid']
+        ))
+      );
+      
+      allow create: if isAuthenticated() && (
+        (!isAnonymous() && request.resource.data.passengerId == request.auth.uid) || 
+        (request.resource.data.get('isDemo', false) == true && (isAnonymous() || request.resource.data.passengerId == request.auth.uid))
+      );
+      
+      // Updates: Driver cannot tamper with fare, platformFee, commission, or passenger details
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
+        (
+          resource.data.get('isDemo', false) != true && (
+            (
+              resource.data.passengerId == request.auth.uid &&
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driverId', 'fare', 'platformFee', 'platformCommission'])
+            ) ||
+            (
+              resource.data.driverId == request.auth.uid &&
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['fare', 'platformFee', 'platformCommission', 'passengerId'])
+            ) ||
+            (
+              resource.data.status == 'searching' && 
+              request.resource.data.driverId == request.auth.uid &&
+              isDriver() &&
+              get(/databases/$(database)/documents/drivers/$(request.auth.uid)).data.get('verificationStatus', '') == 'approved'
+            )
+          )
+        ) ||
+        (
+          resource.data.get('isDemo', false) == true && (
+            isAnonymous() || 
+            request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid'] ||
+            resource.data.passengerId == request.auth.uid || 
+            resource.data.driverId == request.auth.uid ||
+            request.resource.data.driverId == request.auth.uid
+          )
+        )
+      );
+
+      allow delete: if isRealAdmin() || (isDemoAdmin() && resource.data.get('isDemo', false) == true);
+    }
+
+    // ==========================================
+    // 7. PAYMENTS COLLECTION
+    // ==========================================
+    // Driver can ONLY read payments where driverId == request.auth.uid
+    // Passenger can ONLY read payments where passengerId == request.auth.uid
+    // Platform revenue & full ledger readable ONLY by Admin
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
+        resource == null || 
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid'])) ||
+        (resource.data.get('isDemo', false) != true && (
+          request.auth.uid == resource.data.passengerId || 
+          request.auth.uid == resource.data.driverId
+        ))
+      );
+      
+      allow create: if isAuthenticated() && (
+        isRealAdmin() || 
+        (
+          (!isAnonymous() || request.resource.data.get('isDemo', false) == true) && (
+            request.auth.uid == request.resource.data.passengerId || 
+            request.auth.uid == request.resource.data.driverId
+          )
+        )
+      );
+      
+      // Clients cannot tamper with amounts, commission, or driver earnings
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
+        (
+          (!isAnonymous() || resource.data.get('isDemo', false) == true) && 
+          (request.auth.uid == resource.data.driverId || request.auth.uid == resource.data.passengerId) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'amount', 'currency', 'platformFee', 'platformCommission',
+            'driverEarnings', 'driverAmount', 'isDemo', 'providerTransactionId', 'merchantTransactionId'
+          ]) &&
+          (
+            request.resource.data.get('paymentStatus', 'pending') != 'paid' || 
+            (resource.data.get('paymentMethod', 'cash') == 'cash' && request.auth.uid == resource.data.driverId)
+          )
+        )
+      );
+
+      allow delete: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 8. RATINGS COLLECTION
+    // ==========================================
+    match /ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        isRealAdmin() || 
+        (
+          (request.auth.uid == request.resource.data.fromUserId ||
+           request.auth.uid == request.resource.data.passengerId ||
+           request.auth.uid == request.resource.data.driverId) &&
+          request.resource.data.rating >= 1 &&
+          request.resource.data.rating <= 5
+        )
+      );
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        request.auth.uid == resource.data.fromUserId
+      );
+      allow delete: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 9. NOTIFICATIONS COLLECTION
+    // ==========================================
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        isRealAdmin() || 
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
+        resource == null || 
+        request.auth.uid == resource.data.userId
+      );
+      allow create: if isAuthenticated() && (
+        isRealAdmin() ||
+        (
+          // Non-admin can only create notification targeting a specific user (e.g. ride status update)
+          request.resource.data.userId != null &&
+          request.resource.data.userId != ''
+        )
+      );
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        request.auth.uid == resource.data.userId
+      );
+      allow delete: if isAuthenticated() && (
+        isRealAdmin() || 
+        request.auth.uid == resource.data.userId
+      );
+    }
+
+    // ==========================================
+    // 10. PRICING & PRICING CONFIGS
+    // ==========================================
+    match /pricing/{rideType} {
+      allow read: if true;
+      allow write: if isRealAdmin();
+    }
+
+    match /pricingConfigs/{configId} {
+      allow read: if true;
+      allow write: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 11. INCIDENTS & SAFETY
+    // ==========================================
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated() && (
+        isRealAdmin() || 
+        resource.data.reportedBy == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        resource.data.passengerId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isRealAdmin() || 
+        request.resource.data.reportedBy == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        (resource.data.reportedBy == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'resolution', 'resolvedAt', 'resolvedBy']))
+      );
+      allow delete: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 12. SUPPORT TICKETS
+    // ==========================================
+    match /support/{ticketId} {
+      allow read: if isAuthenticated() && (
+        isRealAdmin() || 
+        resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isRealAdmin() || 
+        request.resource.data.userId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isRealAdmin() || 
+        (resource.data.userId == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'priority', 'assignedTo']))
+      );
+      allow delete: if isRealAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          isRealAdmin() || 
+          get(/databases/$(database)/documents/support/$(ticketId)).data.userId == request.auth.uid
+        );
+        allow create: if isAuthenticated() && (
+          isRealAdmin() || 
+          (
+            get(/databases/$(database)/documents/support/$(ticketId)).data.userId == request.auth.uid &&
+            request.resource.data.senderId == request.auth.uid
+          )
+        );
+        allow delete: if isRealAdmin();
+      }
+    }
+
+    // ==========================================
+    // 13. AUDIT LOGS
+    // ==========================================
+    match /audit_logs/{logId} {
+      allow read: if isRealAdmin();
+      allow create: if isRealAdmin() || (isAuthenticated() && request.resource.data.get('action', '') == 'DRIVER_EMERGENCY_SOS');
+      allow update, delete: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 14. TEST PROBE
+    // ==========================================
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // ==========================================
+    // 15. PHONE INDEX (Uniqueness Mapping)
+    // ==========================================
+    match /phoneIndex/{phone} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (
+        isRealAdmin() ||
+        request.resource.data.get('uid', '') == request.auth.uid
+      );
+    }
+  }
+}

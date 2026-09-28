@@ -1,0 +1,1001 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ * ZAKA E-Hailing Platform - Comprehensive Firebase Authentication & Registration
+ * Visuals: Yellow #FFC107 brand primary, white cards, subtle borders, dark typography
+ */
+
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { UserRole, VehicleType } from '../../types';
+import { isRiderTarget } from '../../config/appTarget';
+import {
+  X,
+  User,
+  Car,
+  Shield,
+  Sparkles,
+  ArrowRight,
+  Mail,
+  Lock,
+  Phone,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertTriangle,
+  KeyRound,
+  Info,
+  ShieldCheck,
+} from 'lucide-react';
+
+interface AuthModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialMode?: 'signin' | 'signup' | 'forgot';
+  initialRole?: UserRole;
+}
+
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  initialMode = 'signin',
+  initialRole = 'passenger',
+}) => {
+  const {
+    signIn,
+    signUp,
+    registerPassengerAccount,
+    provisionPassengerProfile,
+    signInWithGoogle,
+    resetPassword,
+  } = useAuth();
+
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
+  const [signupStep, setSignupStep] = useState<'role' | 'details'>(isRiderTarget ? 'details' : 'role');
+  const [role, setRole] = useState<UserRole>(isRiderTarget ? 'passenger' : initialRole);
+
+  // Input fields
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Driver vehicle specs
+  const [vehicleMake, setVehicleMake] = useState('Toyota');
+  const [vehicleModel, setVehicleModel] = useState('Corolla Quest');
+  const [vehicleColour, setVehicleColour] = useState('Silver');
+  const [vehiclePlate, setVehiclePlate] = useState('ZK 89 GP');
+  const [vehicleType, setVehicleType] = useState<VehicleType>('economy');
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isProfilePending, setIsProfilePending] = useState(false);
+  const [createdAuthUser, setCreatedAuthUser] = useState<any>(null);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Quick Password Reset State
+  const [quickResetLoading, setQuickResetLoading] = useState(false);
+  const [quickResetSuccess, setQuickResetSuccess] = useState(false);
+  const [quickResetEmail, setQuickResetEmail] = useState('');
+
+  const handleQuickPasswordReset = async (targetEmail?: string) => {
+    const emailToUse = (targetEmail || email || '').trim().toLowerCase();
+    if (!emailToUse || !emailToUse.includes('@')) {
+      setError('Please enter a valid email address to receive a password reset link.');
+      return;
+    }
+    setQuickResetLoading(true);
+    try {
+      await resetPassword(emailToUse);
+      setQuickResetSuccess(true);
+      setQuickResetEmail(emailToUse);
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Unable to send password reset email. Please try again.');
+    } finally {
+      setQuickResetLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      const chosenRole = isRiderTarget ? 'passenger' : (initialRole || 'passenger');
+      setRole(chosenRole);
+      if (initialRole === 'driver') {
+        setSignupStep('details');
+      } else if (initialMode === 'signup' && !isRiderTarget && !initialRole) {
+        setSignupStep('role');
+      } else {
+        setSignupStep('details');
+      }
+      setError('');
+      setIsProfilePending(false);
+      setCreatedAuthUser(null);
+      setQuickResetSuccess(false);
+    }
+  }, [isOpen, initialMode, initialRole]);
+
+  if (!isOpen) return null;
+
+  const handleGoogleSignIn = async (selectedRole: UserRole = role) => {
+    setError('');
+    setLoading(true);
+    try {
+      await signInWithGoogle(selectedRole);
+      onClose();
+    } catch (err: any) {
+      if (err.message !== 'Sign-in cancelled.') {
+        setError(err.message || 'Google sign-in was unsuccessful.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignInSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setQuickResetSuccess(false);
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await signIn(cleanEmail, password);
+      onClose();
+    } catch (err: any) {
+      console.warn('[ZAKA Login Modal] Sign-in notice:', err?.message || err);
+      setError(err.message || 'Unable to sign in. Please check your email and password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
+
+    if (!cleanName) {
+      setError('Please enter your full name.');
+      return;
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!cleanPhone) {
+      setError('Please enter your phone number.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must contain at least 6 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please ensure both passwords are identical.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (role === 'passenger') {
+        await signUp({
+          email: cleanEmail,
+          pass: password,
+          name: cleanName,
+          phone: cleanPhone,
+          role: 'passenger',
+        });
+        setName('');
+        setEmail('');
+        setPhone('');
+        setPassword('');
+        setConfirmPassword('');
+        setError('');
+        setIsProfilePending(false);
+        setCreatedAuthUser(null);
+        onClose();
+      } else {
+        await signUp({
+          email: cleanEmail,
+          pass: password,
+          name: cleanName,
+          phone: cleanPhone,
+          role,
+          vehicle: {
+            vehicleType,
+            make: vehicleMake,
+            model: vehicleModel,
+            colour: vehicleColour,
+            registrationNumber: vehiclePlate,
+            passengerCapacity: vehicleType === 'xl' ? 6 : vehicleType === 'moto' ? 1 : 4,
+            status: 'pending',
+          },
+        });
+        setName('');
+        setEmail('');
+        setPhone('');
+        setPassword('');
+        setConfirmPassword('');
+        setError('');
+        setIsProfilePending(false);
+        setCreatedAuthUser(null);
+        onClose();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Please enter your email address.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+
+    try {
+      await resetPassword(email);
+      setResetSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send password reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col rounded-3xl border border-[#E5E5E5] bg-white shadow-2xl overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b border-[#E5E5E5] p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFC107] font-black text-[#111111] text-base shadow-sm">
+              Z
+            </div>
+            <div>
+              <h3 className="text-base font-black text-[#111111]">
+                {mode === 'signin' && 'Sign In to ZAKA'}
+                {mode === 'signup' && 'Create Your ZAKA Account'}
+                {mode === 'forgot' && 'Reset Your Password'}
+              </h3>
+              <p className="text-[11px] text-neutral-500 font-medium">
+                Official Firebase Authentication & Firestore DB
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-[#111111]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Quick Password Reset Success Banner */}
+          {quickResetSuccess && (
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs text-emerald-800 space-y-1">
+              <div className="flex items-center gap-2 font-bold">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>Password Reset Link Dispatched!</span>
+              </div>
+              <p className="text-[11px] text-emerald-700 leading-relaxed font-medium">
+                We sent a password reset email to <strong>{quickResetEmail}</strong>. Please check your inbox or spam folder, click the link to set or update your password, then sign in below.
+              </p>
+            </div>
+          )}
+
+          {/* Error Banner */}
+          {error && (
+            <div className="rounded-2xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-700 space-y-2.5">
+              <div className="flex items-start gap-2.5 font-bold">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
+                <span className="leading-snug">{error}</span>
+              </div>
+
+              {/* Action 1: If account already exists / already registered */}
+              {(error.includes('already exists') || error.includes('already registered')) && (
+                <div className="pt-2 border-t border-red-200/80 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError('');
+                      setMode('signin');
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-white border border-red-200 py-2.5 text-xs font-bold text-neutral-900 shadow-2xs hover:bg-neutral-50 active:scale-[0.99] transition-all cursor-pointer"
+                  >
+                    <span>Sign In to Existing Account</span>
+                    <ArrowRight className="h-3.5 w-3.5 text-[#FFC107]" />
+                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleGoogleSignIn(role)}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-white border border-red-200 py-2 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50 active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                      <span>Continue with Google</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickPasswordReset(email)}
+                      disabled={quickResetLoading}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-white border border-red-200 py-2 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50 active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      <KeyRound className="h-3.5 w-3.5 text-[#FFC107]" />
+                      <span>{quickResetLoading ? 'Sending...' : 'Reset Password'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Action 2: If sign in failed due to invalid credentials or user not found */}
+              {(error.includes('Unable to sign in') || error.includes('invalid') || error.includes('password')) && !error.includes('already') && (
+                <div className="pt-2 border-t border-red-200/80 space-y-2">
+                  <p className="text-[11px] text-neutral-600 font-medium">
+                    If this account was registered with Google, you can sign in with Google or set a password using the link below:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickPasswordReset(email)}
+                      disabled={quickResetLoading}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-white border border-red-200 py-2 text-xs font-bold text-neutral-900 shadow-2xs hover:bg-neutral-50 active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      <KeyRound className="h-3.5 w-3.5 text-[#FFC107]" />
+                      <span>{quickResetLoading ? 'Sending link...' : 'Send Reset / Set Link'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGoogleSignIn(role)}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-white border border-red-200 py-2 text-xs font-bold text-neutral-800 shadow-2xs hover:bg-neutral-50 active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                      <span>Continue with Google</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {error.includes('Email/Password provider requires activation') && (
+                <div className="pt-2 border-t border-red-200/80 space-y-2">
+                  <p className="text-[11px] text-red-800 leading-relaxed font-medium">
+                    <strong>Notice:</strong> Email/Password provider requires activation in the Firebase Console. You can continue using Google Sign-In:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleSignIn(role)}
+                    className="w-full mt-1.5 flex items-center justify-center gap-2 rounded-xl bg-white border border-red-200 py-2 text-xs font-bold text-neutral-900 shadow-2xs hover:bg-neutral-50"
+                  >
+                    <span>Continue with Google as {role === 'driver' ? 'Driver' : 'Passenger'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= MODE 1: SIGN IN ================= */}
+          {mode === 'signin' && (
+            <>
+              {/* Google Sign In Option */}
+              <button
+                type="button"
+                onClick={() => handleGoogleSignIn('passenger')}
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#E5E5E5] bg-white py-3 text-xs font-bold text-[#111111] hover:bg-neutral-50 active:scale-[0.99] transition-all shadow-2xs"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
+              </button>
+
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#E5E5E5]" />
+                </div>
+                <span className="relative bg-white px-3 text-[11px] font-bold uppercase text-neutral-400">
+                  Or Sign In with Email
+                </span>
+              </div>
+
+              <form onSubmit={handleSignInSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#111111] mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-9 pr-3 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                      required
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                      autoComplete="email"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-[#111111]">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError('');
+                        setMode('forgot');
+                      }}
+                      className="text-[11px] font-bold text-[#111111] hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-9 pr-10 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-neutral-400 hover:text-[#111111]"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-2xl bg-[#FFC107] py-3.5 text-xs font-black text-[#111111] shadow-md hover:bg-[#FFB300] active:scale-[0.99] transition-all"
+                >
+                  {loading ? 'Authenticating...' : 'Sign In to ZAKA'}
+                </button>
+              </form>
+
+              <div className="text-center text-xs text-neutral-500 pt-1">
+                Don't have a ZAKA account yet?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setMode('signup');
+                    setSignupStep('role');
+                  }}
+                  className="font-black text-[#111111] underline"
+                >
+                  Register Now
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ================= MODE 2: SIGN UP FLOW ================= */}
+          {mode === 'signup' && (
+            <>
+              {/* Step 1: "How will you use ZAKA?" Role Selection */}
+              {signupStep === 'role' && (
+                <div className="space-y-4">
+                  <div className="text-center space-y-1">
+                    <h4 className="text-sm font-black text-[#111111]">How will you use ZAKA?</h4>
+                    <p className="text-xs text-neutral-500">
+                      Select your account type to proceed with customized onboarding.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Passenger Option */}
+                    <div
+                      onClick={() => setRole('passenger')}
+                      className={`cursor-pointer rounded-2xl border-2 p-4 transition-all ${
+                        role === 'passenger'
+                          ? 'border-[#FFC107] bg-amber-50/40 shadow-sm'
+                          : 'border-[#E5E5E5] hover:border-neutral-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#111111] text-[#FFC107]">
+                          <User className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-xs font-black text-[#111111]">I want to Ride (Passenger)</h5>
+                            {role === 'passenger' && (
+                              <CheckCircle2 className="h-4 w-4 text-[#111111] fill-[#FFC107]" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">
+                            Request on-demand rides, track live drivers, pay seamlessly, and travel safely.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Driver Option */}
+                    <div
+                      onClick={() => setRole('driver')}
+                      className={`cursor-pointer rounded-2xl border-2 p-4 transition-all ${
+                        role === 'driver'
+                          ? 'border-[#FFC107] bg-amber-50/40 shadow-sm'
+                          : 'border-[#E5E5E5] hover:border-neutral-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#111111] text-[#FFC107]">
+                          <Car className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-xs font-black text-[#111111]">I want to Drive (Driver)</h5>
+                            {role === 'driver' && (
+                              <CheckCircle2 className="h-4 w-4 text-[#111111] fill-[#FFC107]" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">
+                            Earn 85% on every trip with flexible hours, smart dispatches, and weekly payouts.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSignupStep('details')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FFC107] py-3.5 text-xs font-black text-[#111111] shadow-md hover:bg-[#FFB300] active:scale-[0.99] transition-all"
+                  >
+                    <span>Continue with Email Registration</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+
+                  <div className="relative flex items-center justify-center pt-1">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[#E5E5E5]" />
+                    </div>
+                    <span className="relative bg-white px-3 text-[10px] font-bold uppercase text-neutral-400">
+                      Or Fast Signup
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleSignIn(role)}
+                    disabled={loading}
+                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#E5E5E5] bg-white py-3 text-xs font-bold text-[#111111] hover:bg-neutral-50 active:scale-[0.99] transition-all shadow-2xs"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Register as {role === 'passenger' ? 'Passenger' : 'Driver'} with Google</span>
+                  </button>
+
+                  <div className="text-center text-xs text-neutral-500">
+                    Already registered?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError('');
+                        setMode('signin');
+                      }}
+                      className="font-bold text-[#111111] underline"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Account Details & Registration Form */}
+              {signupStep === 'details' && (
+                <form onSubmit={handleSignUpSubmit} className="space-y-3.5">
+                  {!isRiderTarget && (
+                    <div className="flex items-center rounded-2xl bg-[#F5F5F5] p-1 border border-[#E5E5E5] mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setRole('passenger')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all cursor-pointer ${
+                          role === 'passenger'
+                            ? 'bg-[#111111] text-white shadow-xs'
+                            : 'text-neutral-600 hover:text-[#111111]'
+                        }`}
+                      >
+                        <User className={`h-3.5 w-3.5 ${role === 'passenger' ? 'text-[#FFC107]' : ''}`} />
+                        <span>Passenger / Rider</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRole('driver')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all cursor-pointer ${
+                          role === 'driver'
+                            ? 'bg-[#111111] text-white shadow-xs'
+                            : 'text-neutral-600 hover:text-[#111111]'
+                        }`}
+                      >
+                        <Car className={`h-3.5 w-3.5 ${role === 'driver' ? 'text-[#FFC107]' : ''}`} />
+                        <span>Driver (Drive &amp; Earn)</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-[11px] font-bold text-neutral-500 uppercase">
+                      {role === 'passenger' ? 'Passenger Registration' : 'Driver Registration'}
+                    </span>
+                    {!isRiderTarget && (
+                      <button
+                        type="button"
+                        onClick={() => setSignupStep('role')}
+                        className="text-[11px] font-bold text-[#111111] underline cursor-pointer"
+                      >
+                        Overview
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Personal Information */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">Full Name</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Tendai Mthembu"
+                        className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-9 pr-3 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                      Phone Number (South Africa)
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+27 82 123 4567"
+                        className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-9 pr-3 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-9 pr-3 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password & Confirm Password */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-600 mb-1">Password</label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Min. 6 chars"
+                          className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-3 pr-8 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-[#111111]"
+                        >
+                          {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-600 mb-1">Confirm Password</label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat password"
+                          className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-3 pr-8 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-2.5 top-2.5 text-neutral-400 hover:text-[#111111]"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Driver Vehicle Specs */}
+                  {role === 'driver' && (
+                    <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase text-[#111111]">
+                          Vehicle Specifications
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                          Pending Verification
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={vehicleMake}
+                          onChange={(e) => setVehicleMake(e.target.value)}
+                          placeholder="Make (e.g. Toyota)"
+                          className="rounded-xl border border-[#E5E5E5] bg-white p-2 text-xs text-[#111111]"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={vehicleModel}
+                          onChange={(e) => setVehicleModel(e.target.value)}
+                          placeholder="Model (e.g. Corolla)"
+                          className="rounded-xl border border-[#E5E5E5] bg-white p-2 text-xs text-[#111111]"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={vehicleColour}
+                          onChange={(e) => setVehicleColour(e.target.value)}
+                          placeholder="Colour (e.g. Silver)"
+                          className="rounded-xl border border-[#E5E5E5] bg-white p-2 text-xs text-[#111111]"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={vehiclePlate}
+                          onChange={(e) => setVehiclePlate(e.target.value)}
+                          placeholder="Plate (e.g. ZK 89 GP)"
+                          className="rounded-xl border border-[#E5E5E5] bg-white p-2 text-xs text-[#111111]"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
+                          Vehicle Service Class
+                        </label>
+                        <div className="grid grid-cols-4 gap-1">
+                          {(['economy', 'comfort', 'xl', 'moto'] as VehicleType[]).map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => setVehicleType(v)}
+                              className={`rounded-lg py-1.5 text-[10px] font-black uppercase transition-all ${
+                                vehicleType === v
+                                  ? 'bg-[#111111] text-[#FFC107]'
+                                  : 'bg-white border border-[#E5E5E5] text-neutral-600'
+                              }`}
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-neutral-500 leading-snug">
+                        * Note: New driver accounts start with status <strong>Pending Verification</strong> until approved by Fleet Admin.
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-2xl bg-[#FFC107] py-3.5 text-xs font-black text-[#111111] shadow-md hover:bg-[#FFB300] active:scale-[0.99] transition-all cursor-pointer"
+                  >
+                    {loading
+                      ? isProfilePending
+                        ? 'Setting Up Profile...'
+                        : 'Creating ZAKA Account...'
+                      : isProfilePending
+                      ? 'Finish Setting Up Profile'
+                      : role === 'driver'
+                      ? 'Complete Driver Registration'
+                      : 'Complete Passenger Registration'}
+                  </button>
+
+                  <div className="text-center text-xs text-neutral-500">
+                    Already registered?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError('');
+                        setMode('signin');
+                      }}
+                      className="font-bold text-[#111111] underline"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          )}
+
+          {/* ================= MODE 3: FORGOT PASSWORD ================= */}
+          {mode === 'forgot' && (
+            <div className="space-y-4">
+              <div className="text-center space-y-1">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-[#111111] mb-2">
+                  <KeyRound className="h-6 w-6 text-[#111111]" />
+                </div>
+                <h4 className="text-sm font-black text-[#111111]">Reset Your Password</h4>
+                <p className="text-xs text-neutral-500">
+                  Enter your registered email address and we will send a password reset link to your inbox.
+                </p>
+              </div>
+
+              {resetSuccess ? (
+                <div className="space-y-3 rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-center">
+                  <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
+                  <h5 className="text-xs font-black text-emerald-900">Password Reset Link Sent!</h5>
+                  <p className="text-[11px] text-emerald-800">
+                    We've emailed instructions to <strong>{email}</strong>. Please check your inbox and spam folder.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetSuccess(false);
+                      setMode('signin');
+                    }}
+                    className="w-full rounded-xl bg-[#111111] py-2.5 text-xs font-bold text-white hover:bg-neutral-800"
+                  >
+                    Return to Sign In
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-[#111111] mb-1">
+                      Registered Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-2.5 pl-9 pr-3 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-2xl bg-[#FFC107] py-3.5 text-xs font-black text-[#111111] shadow-md hover:bg-[#FFB300] active:scale-[0.99] transition-all"
+                  >
+                    {loading ? 'Sending Instructions...' : 'Send Password Reset Link'}
+                  </button>
+
+                  <div className="text-center text-xs text-neutral-500">
+                    Remember your password?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError('');
+                        setMode('signin');
+                      }}
+                      className="font-bold text-[#111111] underline"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

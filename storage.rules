@@ -1,0 +1,47 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isRealAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.get('role', '') == 'admin' ||
+        request.auth.token.get('email', '') in ['admin@zaka.io', 'zaka.backend.service@zaka.io', 'ian.mkhize@gmail.com'] ||
+        request.auth.uid in ['Js6QAJWZskfRhInQFlX4fjlZ9Ws1', 'KCKA8mq7u6Udj5Lp4pIMSqlEgPJ2']
+      );
+    }
+    
+    // Drivers upload directory:
+    // Path: drivers/{driverId}/documents/{documentFile}
+    // Path: drivers/{driverId}/profile-photo
+    match /drivers/{driverId}/{allPaths=**} {
+      // Authenticated driver can only upload to their own directory, max 10MB, valid MIME types
+      allow write: if isAuthenticated() && (
+        isOwner(driverId) || isRealAdmin()
+      ) && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('(image/(jpeg|png|webp)|application/pdf)');
+
+      // Driver can read their own documents; Admins can read all driver verification documents
+      allow read: if isAuthenticated() && (
+        isOwner(driverId) || isRealAdmin()
+      );
+      
+      // Driver or admin can delete previous versions
+      allow delete: if isAuthenticated() && (
+        isOwner(driverId) || isRealAdmin()
+      );
+    }
+    
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

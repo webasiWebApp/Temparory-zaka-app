@@ -1,0 +1,275 @@
+{
+  "entities": {
+    "users": {
+      "title": "users",
+      "description": "User accounts with roles (passenger, driver, admin)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["passenger", "driver", "admin"] },
+        "status": { "type": "string", "enum": ["active", "pending", "suspended"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "role", "status"]
+    },
+    "passengers": {
+      "title": "passengers",
+      "description": "Passenger profiles and statistics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "rating": { "type": "number" },
+        "totalTrips": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name"]
+    },
+    "drivers": {
+      "title": "drivers",
+      "description": "Driver profiles, active location, and dispatch status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "rating": { "type": "number" },
+        "totalTrips": { "type": "number" },
+        "online": { "type": "boolean" },
+        "available": { "type": "boolean" },
+        "verificationStatus": { "type": "string", "enum": ["approved", "pending", "rejected"] },
+        "currentLocation": { "type": "object" },
+        "vehicleType": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "online", "available", "verificationStatus"]
+    },
+    "vehicles": {
+      "title": "vehicles",
+      "description": "Vehicle details linked to drivers",
+      "type": "object",
+      "properties": {
+        "driverId": { "type": "string" },
+        "vehicleType": { "type": "string", "enum": ["economy", "comfort", "xl", "moto"] },
+        "make": { "type": "string" },
+        "model": { "type": "string" },
+        "colour": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "passengerCapacity": { "type": "number" },
+        "photoURL": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "pending", "inactive"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["driverId", "vehicleType", "make", "model", "registrationNumber"]
+    },
+    "rides": {
+      "title": "rides",
+      "description": "Ride requests, lifecycle state, and dispatch assignment",
+      "type": "object",
+      "properties": {
+        "passengerId": { "type": "string" },
+        "passengerName": { "type": "string" },
+        "passengerPhone": { "type": "string" },
+        "passengerPhotoURL": { "type": "string" },
+        "passengerRating": { "type": "number" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "driverPhone": { "type": "string" },
+        "driverPhotoURL": { "type": "string" },
+        "driverRating": { "type": "number" },
+        "driverCurrentLocation": { "type": "object" },
+        "vehicleDetails": { "type": "object" },
+        "pickupLocation": { "type": "object" },
+        "destinationLocation": { "type": "object" },
+        "pickupAddress": { "type": "string" },
+        "destinationAddress": { "type": "string" },
+        "rideType": { "type": "string", "enum": ["economy", "comfort", "xl", "moto"] },
+        "estimatedDistanceKm": { "type": "number" },
+        "distanceKm": { "type": "number" },
+        "estimatedDurationMin": { "type": "number" },
+        "estimatedDurationMinutes": { "type": "number" },
+        "baseFare": { "type": "number" },
+        "distanceFare": { "type": "number" },
+        "timeFare": { "type": "number" },
+        "estimatedFare": { "type": "number" },
+        "finalFare": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string", "enum": ["searching", "accepted", "driver_arriving", "driver_arrived", "in_progress", "completed", "cancelled"] },
+        "otp": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "card", "digital", "wallet"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "processing", "paid", "failed", "cancelled"] },
+        "requestedAt": { "type": "string" },
+        "acceptedAt": { "type": "string" },
+        "driverArrivedAt": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "completedAt": { "type": "string" },
+        "cancelledAt": { "type": "string" },
+        "cancellationReason": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["passengerId", "pickupAddress", "destinationAddress", "rideType", "estimatedFare", "status"]
+    },
+    "payments": {
+      "title": "payments",
+      "description": "Payment transactions for completed rides",
+      "type": "object",
+      "properties": {
+        "paymentId": { "type": "string" },
+        "rideId": { "type": "string" },
+        "passengerId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "card", "digital", "wallet"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "processing", "paid", "failed", "cancelled"] },
+        "provider": { "type": "string" },
+        "transactionReference": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "paidAt": { "type": "string" }
+      },
+      "required": ["rideId", "passengerId", "driverId", "amount", "paymentMethod", "paymentStatus"]
+    },
+    "ratings": {
+      "title": "ratings",
+      "description": "Passenger and driver ride ratings and feedback",
+      "type": "object",
+      "properties": {
+        "ratingId": { "type": "string" },
+        "rideId": { "type": "string" },
+        "fromUserId": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "fromRole": { "type": "string", "enum": ["passenger", "driver"] },
+        "toRole": { "type": "string", "enum": ["passenger", "driver"] },
+        "passengerId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "tip": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["rideId", "fromUserId", "toUserId", "rating"]
+    },
+    "notifications": {
+      "title": "notifications",
+      "description": "In-app notifications for users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "message", "read"]
+    },
+    "pricing": {
+      "title": "pricing",
+      "description": "Dynamic ride type pricing configurations and rates controlled by admin",
+      "type": "object",
+      "properties": {
+        "rideType": { "type": "string", "enum": ["economy", "comfort", "xl", "moto"] },
+        "name": { "type": "string" },
+        "tagline": { "type": "string" },
+        "baseFare": { "type": "number" },
+        "perKmRate": { "type": "number" },
+        "perMinuteRate": { "type": "number" },
+        "minimumFare": { "type": "number" },
+        "passengerCapacity": { "type": "number" },
+        "estimatedEtaMins": { "type": "number" },
+        "active": { "type": "boolean" },
+        "currency": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["rideType", "baseFare", "perKmRate", "perMinuteRate", "minimumFare", "passengerCapacity", "active"]
+    },
+    "phoneIndex": {
+      "title": "phoneIndex",
+      "description": "Unique phone index mapping to user UID",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "normalizedPhone": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "normalizedPhone"]
+    },
+    "driverDocumentContents": {
+      "title": "driverDocumentContents",
+      "description": "Base64 and binary storage cache for driver compliance documents",
+      "type": "object",
+      "properties": {
+        "driverId": { "type": "string" },
+        "documentType": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileData": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["driverId", "documentType", "fileData"]
+    }
+  },
+  "firestore": {
+    "/driver_document_contents/{docKey}": {
+      "schema": "driverDocumentContents",
+      "description": "Driver compliance document contents cache"
+    },
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile documents"
+    },
+    "/phoneIndex/{phone}": {
+      "schema": "phoneIndex",
+      "description": "Unique phone index entries"
+    },
+    "/users/{userId}/recentDestinations/{destinationId}": {
+      "schema": "object",
+      "description": "Recent passenger destinations"
+    },
+    "/passengers/{passengerId}": {
+      "schema": "passengers",
+      "description": "Passenger profiles"
+    },
+    "/drivers/{driverId}": {
+      "schema": "drivers",
+      "description": "Driver profiles"
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": "vehicles",
+      "description": "Vehicle profiles"
+    },
+    "/rides/{rideId}": {
+      "schema": "rides",
+      "description": "Ride transactions"
+    },
+    "/payments/{paymentId}": {
+      "schema": "payments",
+      "description": "Payment records"
+    },
+    "/ratings/{ratingId}": {
+      "schema": "ratings",
+      "description": "User ratings"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notifications",
+      "description": "User notifications"
+    },
+    "/pricing/{rideType}": {
+      "schema": "pricing",
+      "description": "Configurable fare structures by vehicle category"
+    }
+  }
+}
