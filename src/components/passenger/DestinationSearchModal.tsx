@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  * ZAKA E-Hailing Platform - Destination & Pickup Search Experience
- * Visuals: Clean white panel, high-contrast typography, #FF7A00 accents, recent places, real-time search
+ * Visuals: Clean white panel, high-contrast typography, #ff860d accents, recent places, real-time search
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -212,13 +212,13 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
   const getPlaceIcon = (type?: string) => {
     switch (type) {
       case 'airport':
-        return <Plane className="h-5 w-5 text-[#111111]" />;
+        return <Plane className="h-5 w-5 text-ink" />;
       case 'shopping_mall':
-        return <ShoppingBag className="h-5 w-5 text-[#111111]" />;
+        return <ShoppingBag className="h-5 w-5 text-ink" />;
       case 'university':
-        return <GraduationCap className="h-5 w-5 text-[#111111]" />;
+        return <GraduationCap className="h-5 w-5 text-ink" />;
       default:
-        return <MapPin className="h-5 w-5 text-[#111111]" />;
+        return <MapPin className="h-5 w-5 text-ink" />;
     }
   };
 
@@ -227,20 +227,20 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in fade-in duration-200">
       {/* Top Header & Search Bar */}
-      <div className="border-b border-[#E5E5E5] bg-white px-4 pt-4 pb-3 shadow-xs">
+      <div className="border-b border-line bg-white px-4 pt-4 pb-3 ">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-[#111111] hover:bg-[#F4F5F7] active:scale-95 transition-all cursor-pointer"
+            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-ink hover:bg-surface-2 active:scale-95 transition-all cursor-pointer"
             aria-label="Back"
           >
             <ArrowLeft className="h-6 w-6" />
           </button>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-bold text-[#111111]">
+            <h2 className="text-base font-bold text-ink">
               {isSelectingPickup ? 'Set Pickup Location' : 'Where are you going?'}
             </h2>
-            <p className="text-xs text-[#666666] truncate max-w-[280px]">
+            <p className="text-xs text-ink-2 truncate max-w-[280px]">
               Pickup: {currentPickup?.address || 'Current Location (Pending selection)'}
             </p>
           </div>
@@ -250,9 +250,9 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
         <div className="relative mt-3">
           <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
             {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-[#FF7A00]" />
+              <Loader2 className="h-5 w-5 animate-spin text-primary-text" />
             ) : (
-              <Search className="h-5 w-5 text-[#666666]" />
+              <Search className="h-5 w-5 text-ink-2" />
             )}
           </div>
           <input
@@ -261,12 +261,12 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={isSelectingPickup ? 'Search pickup address or landmark' : 'Search destination, mall, airport...'}
-            className="w-full rounded-2xl border border-[#E5E5E5] bg-[#F4F5F7] py-3.5 pl-11 pr-10 text-sm font-medium text-[#111111] placeholder-[#888888] focus:border-[#FF7A00] focus:bg-white focus:outline-none transition-all shadow-inner"
+            className="w-full rounded-input border border-line bg-surface-2 py-3.5 pl-11 pr-10 text-sm font-medium text-ink placeholder-ink-3 focus:border-primary focus:bg-white focus:outline-none transition-all shadow-inner"
           />
           {query && (
             <button
               onClick={handleClear}
-              className="absolute inset-y-0 right-3 flex items-center text-[#888888] hover:text-[#111111] min-h-[44px] min-w-[44px] justify-center"
+              className="absolute inset-y-0 right-3 flex items-center text-ink-3 hover:text-ink min-h-[44px] min-w-[44px] justify-center"
             >
               <X className="h-5 w-5" />
             </button>
@@ -280,20 +280,20 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
         <button
           onClick={handleUseCurrentLocation}
           disabled={isGettingCurrentLocation}
-          className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left hover:bg-[#F9FAFB] active:bg-[#F4F5F7] transition-colors border-b border-[#F0F0F0]"
+          className="flex w-full items-center gap-3.5 rounded-card p-3 text-left hover:bg-surface-2 active:bg-surface-2 transition-colors border-b border-surface-2"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#FF7A00]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-primary-text">
             {isGettingCurrentLocation ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <Navigation className="h-5 w-5 text-[#FF7A00] fill-[#FF7A00]/20" />
+              <Navigation className="h-5 w-5 text-primary-text fill-primary/20" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#111111]">
+            <p className="text-sm font-bold text-ink">
               {isGettingCurrentLocation ? 'Detecting exact GPS...' : 'Use current GPS location'}
             </p>
-            <p className="text-xs text-[#666666] truncate">Accurate device satellite coordinate</p>
+            <p className="text-xs text-ink-2 truncate">Accurate device satellite coordinate</p>
           </div>
           <ChevronRight className="h-4 w-4 text-[#CCCCCC]" />
         </button>
@@ -301,12 +301,12 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
         {/* Live Search Results */}
         {query.trim().length >= 2 ? (
           <div className="mt-3">
-            <h3 className="px-2 pb-2 text-xs font-bold tracking-wider text-[#888888] uppercase">
+            <h3 className="px-2 pb-2 text-xs font-bold tracking-wider text-ink-3 uppercase">
               Search Results
             </h3>
 
             {searchError && (
-              <div className="my-3 flex items-start gap-2.5 rounded-2xl bg-[#FFF8E1] p-3 text-xs text-[#855D00]">
+              <div className="my-3 flex items-start gap-2.5 rounded-card bg-primary-50 p-3 text-xs text-[#855D00]">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>{searchError}</span>
               </div>
@@ -323,14 +323,14 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
                       name: place.name,
                     })
                   }
-                  className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left hover:bg-[#F9FAFB] active:bg-[#F4F5F7] transition-all"
+                  className="flex w-full items-center gap-3.5 rounded-card p-3 text-left hover:bg-surface-2 active:bg-surface-2 transition-all"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F5F7]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2">
                     {getPlaceIcon(place.type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#111111] truncate">{place.name}</p>
-                    <p className="text-xs text-[#666666] truncate">{place.secondaryText || place.address}</p>
+                    <p className="text-sm font-bold text-ink truncate">{place.name}</p>
+                    <p className="text-xs text-ink-2 truncate">{place.secondaryText || place.address}</p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-[#CCCCCC]" />
                 </button>
@@ -344,7 +344,7 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
             {recentDestinations.length > 0 && (
               <div>
                 <div className="flex items-center justify-between px-2 pb-2">
-                  <h3 className="text-xs font-bold tracking-wider text-[#888888] uppercase flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold tracking-wider text-ink-3 uppercase flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5" />
                     Recent Destinations
                   </h3>
@@ -363,20 +363,20 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
                           name: recent.name,
                         })
                       }
-                      className="group flex w-full cursor-pointer items-center gap-3.5 rounded-2xl p-3 text-left hover:bg-[#F9FAFB] active:bg-[#F4F5F7] transition-all"
+                      className="group flex w-full cursor-pointer items-center gap-3.5 rounded-card p-3 text-left hover:bg-surface-2 active:bg-surface-2 transition-all"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F5F7] text-[#111111]">
-                        <Clock className="h-5 w-5 text-[#666666]" />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-ink">
+                        <Clock className="h-5 w-5 text-ink-2" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-[#111111] truncate">
+                        <p className="text-sm font-bold text-ink truncate">
                           {recent.name || recent.address.split(',')[0]}
                         </p>
-                        <p className="text-xs text-[#666666] truncate">{recent.address}</p>
+                        <p className="text-xs text-ink-2 truncate">{recent.address}</p>
                       </div>
                       <button
                         onClick={(e) => handleDeleteRecent(e, recent.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-[#999999] hover:text-[#DC2626] rounded-lg transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 text-ink-3 hover:text-[#DC2626] rounded-full transition-all"
                         title="Remove from recents"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -389,8 +389,8 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
 
             {/* Popular Curated Places */}
             <div>
-              <h3 className="px-2 pb-2 text-xs font-bold tracking-wider text-[#888888] uppercase flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-[#FF7A00]" />
+              <h3 className="px-2 pb-2 text-xs font-bold tracking-wider text-ink-3 uppercase flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-primary-text" />
                 Popular Destinations
               </h3>
               <div className="space-y-1">
@@ -404,14 +404,14 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
                         name: place.name,
                       })
                     }
-                    className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left hover:bg-[#F9FAFB] active:bg-[#F4F5F7] transition-all"
+                    className="flex w-full items-center gap-3.5 rounded-card p-3 text-left hover:bg-surface-2 active:bg-surface-2 transition-all"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F5F7]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2">
                       {getPlaceIcon(place.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-[#111111] truncate">{place.name}</p>
-                      <p className="text-xs text-[#666666] truncate">{place.secondaryText}</p>
+                      <p className="text-sm font-bold text-ink truncate">{place.name}</p>
+                      <p className="text-xs text-ink-2 truncate">{place.secondaryText}</p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-[#CCCCCC]" />
                   </button>

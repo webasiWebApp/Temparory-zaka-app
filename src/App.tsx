@@ -44,12 +44,12 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-[#F7F7F5]">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-tr from-[#FF7A00] to-[#FFA000] text-white shadow-[0_4px_16px_rgba(255,122,0,0.28)] animate-pulse font-black text-xl">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary animate-pulse font-bold text-xl">
             Z
           </div>
-          <p className="text-xs font-semibold text-neutral-500 tracking-wide uppercase">
+          <p className="text-xs font-semibold text-ink-3 tracking-wide uppercase">
             Loading ZAKA...
           </p>
         </div>
@@ -94,7 +94,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] flex-col bg-[#F7F7F5] font-sans antialiased text-[#111111] select-none overflow-hidden w-full">
+    <div className="flex h-[100dvh] min-h-[100dvh] flex-col bg-white font-sans antialiased text-ink select-none overflow-hidden w-full">
       {/* Global Navigation Header: Rendered for authenticated sessions */}
       {isAuthenticated && (
         <Header

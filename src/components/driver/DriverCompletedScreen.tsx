@@ -143,16 +143,16 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
   return (
     <div id="driver-completed-screen" className="w-full max-w-lg mx-auto space-y-4 text-center">
       {/* Success Badge */}
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-xs">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-success shadow-card">
         <Check className="h-7 w-7 stroke-[3]" />
       </div>
 
       <div>
-        <span className="inline-block rounded-full bg-emerald-100 px-3 py-0.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">
+        <span className="inline-block rounded-full bg-emerald-100 px-3 py-0.5 text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1">
           Dispatched & Completed
         </span>
-        <h3 className="text-lg sm:text-xl font-black text-[#111111] tracking-tight">Trip Completed!</h3>
-        <p className="text-xs text-neutral-500 max-w-xs mx-auto">
+        <h3 className="text-lg sm:text-xl font-bold text-ink tracking-tight">Trip Completed!</h3>
+        <p className="text-xs text-ink-3 max-w-xs mx-auto">
           {isCash
             ? 'Collect cash from passenger and verify below.'
             : 'Payment has been processed to your driver earnings.'}
@@ -161,16 +161,16 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
 
       {/* Cash Collection Action Banner if Cash */}
       {isCash ? (
-        <div className={`rounded-2xl border p-4 text-left transition-all ${
+        <div className={`rounded-card border p-4 text-left transition-all ${
           isPaid
             ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-            : 'bg-amber-50 border-amber-300 text-amber-950 shadow-sm'
+            : 'bg-amber-50 border-amber-300 text-amber-950 '
         }`}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Banknote className={`h-5 w-5 ${isPaid ? 'text-emerald-600' : 'text-amber-700'} shrink-0`} />
+              <Banknote className={`h-5 w-5 ${isPaid ? 'text-success' : 'text-amber-700'} shrink-0`} />
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider">
+                <h4 className="text-xs font-bold uppercase tracking-wider">
                   {isPaid ? 'Cash Payment Confirmed' : 'Cash Collection Required'}
                 </h4>
                 <p className="text-xs mt-0.5">
@@ -180,7 +180,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
                 </p>
               </div>
             </div>
-            <span className="text-sm font-black shrink-0">
+            <span className="text-sm font-bold shrink-0">
               {fareService.formatZAR(finalFare)}
             </span>
           </div>
@@ -191,7 +191,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
               type="button"
               onClick={handleConfirmCashPayment}
               disabled={isConfirmingCash}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] py-2.5 text-xs font-bold text-white shadow-xs hover:bg-neutral-800 active:scale-[0.99] transition-all"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-xs font-bold text-white shadow-card hover:bg-ink active:scale-[0.99] transition-all"
             >
               {isConfirmingCash ? (
                 <>
@@ -200,7 +200,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4 text-[#FFC107]" />
+                  <Check className="h-4 w-4 text-primary-text" />
                   <span>Mark Cash Payment as Paid / Received</span>
                 </>
               )}
@@ -209,16 +209,16 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
         </div>
       ) : (
         /* Electronic Payment Status Banner for Driver */
-        <div className={`rounded-2xl border p-4 text-left transition-all ${
+        <div className={`rounded-card border p-4 text-left transition-all ${
           isPaid
             ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-            : 'bg-blue-50 border-blue-200 text-blue-950 shadow-sm'
+            : 'bg-blue-50 border-blue-200 text-blue-950 '
         }`}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
-              <CreditCard className={`h-5 w-5 ${isPaid ? 'text-emerald-600' : 'text-blue-600'} shrink-0`} />
+              <CreditCard className={`h-5 w-5 ${isPaid ? 'text-success' : 'text-blue-600'} shrink-0`} />
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider">
+                <h4 className="text-xs font-bold uppercase tracking-wider">
                   {isPaid ? 'Peach Payment Confirmed' : 'Electronic Payment Processing'}
                 </h4>
                 <p className="text-xs mt-0.5">
@@ -228,7 +228,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
                 </p>
               </div>
             </div>
-            <span className="text-sm font-black shrink-0">
+            <span className="text-sm font-bold shrink-0">
               {fareService.formatZAR(finalFare)}
             </span>
           </div>
@@ -239,7 +239,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
               type="button"
               onClick={handleVerifyElectronic}
               disabled={isVerifying}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white py-2 text-xs font-bold text-blue-900 shadow-xs hover:bg-blue-50 active:scale-[0.99] transition-all"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-blue-300 bg-white py-2 text-xs font-bold text-blue-900 hover:bg-blue-50 active:scale-[0.99] transition-all"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
               <span>{isVerifying ? 'Checking Gateway...' : 'Refresh Payment Status'}</span>
@@ -249,16 +249,16 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
       )}
 
       {/* Net Earnings Card */}
-      <div className="rounded-2xl border border-[#111111] bg-[#111111] p-4 text-white shadow-md text-left">
+      <div className="rounded-card border border-ink bg-ink p-4 text-white shadow-card text-left">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFC107]">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-primary-text">
             Driver Take-Home (85%)
           </span>
-          <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] font-mono text-neutral-300">
+          <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] font-mono text-neutral-300">
             {ride.paymentMethod?.toUpperCase() || 'CASH'}
           </span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight mt-0.5 text-white">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mt-0.5 text-white">
           {fareService.formatZAR(netEarnings)}
         </h2>
         <div className="mt-2.5 flex items-center justify-between border-t border-neutral-800 pt-2 text-[11px] text-neutral-400">
@@ -268,15 +268,15 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
       </div>
 
       {/* Passenger & Trip Summary Card */}
-      <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3.5 text-left text-xs space-y-2.5 shadow-2xs">
-        <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-2">
+      <div className="rounded-card border border-line bg-surface-2 p-3.5 text-left text-xs space-y-2.5 ">
+        <div className="flex items-center justify-between border-b border-line pb-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 text-[#111111] font-bold text-xs shrink-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 text-ink font-bold text-xs shrink-0">
               {ride.passengerName ? ride.passengerName.charAt(0) : 'P'}
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-[#111111] truncate">{ride.passengerName || 'Passenger'}</p>
-              <p className="text-[10px] text-neutral-500">{ride.rideType.toUpperCase()} Ride</p>
+              <p className="font-bold text-ink truncate">{ride.passengerName || 'Passenger'}</p>
+              <p className="text-[11px] text-ink-3">{ride.rideType.toUpperCase()} Ride</p>
             </div>
           </div>
           <span className="text-[11px] font-bold text-neutral-400">
@@ -287,42 +287,42 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
         {/* Addresses */}
         <div className="space-y-1.5 text-[11px]">
           <div className="flex items-start gap-2">
-            <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+            <div className="mt-1 h-2 w-2 rounded-full bg-success shrink-0" />
             <div className="min-w-0 flex-1 truncate">
               <span className="text-neutral-400 font-medium">From: </span>
-              <span className="font-semibold text-[#111111]">{ride.pickupAddress}</span>
+              <span className="font-semibold text-ink">{ride.pickupAddress}</span>
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <div className="mt-1 h-2 w-2 rounded-full bg-[#FFC107] shrink-0" />
+            <div className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
             <div className="min-w-0 flex-1 truncate">
               <span className="text-neutral-400 font-medium">To: </span>
-              <span className="font-semibold text-[#111111]">{ride.destinationAddress}</span>
+              <span className="font-semibold text-ink">{ride.destinationAddress}</span>
             </div>
           </div>
         </div>
 
         {/* Distance & Time stats */}
-        <div className="grid grid-cols-2 gap-2 border-t border-[#E5E5E5] pt-2 text-center text-[11px]">
+        <div className="grid grid-cols-2 gap-2 border-t border-line pt-2 text-center text-[11px]">
           <div>
-            <span className="text-neutral-400 block text-[10px]">Trip Distance</span>
-            <span className="font-bold text-[#111111]">{ride.estimatedDistanceKm || 5.2} km</span>
+            <span className="text-neutral-400 block text-[11px]">Trip Distance</span>
+            <span className="font-bold text-ink">{ride.estimatedDistanceKm || 5.2} km</span>
           </div>
           <div>
-            <span className="text-neutral-400 block text-[10px]">Duration</span>
-            <span className="font-bold text-[#111111]">{ride.estimatedDurationMin || 15} min</span>
+            <span className="text-neutral-400 block text-[11px]">Duration</span>
+            <span className="font-bold text-ink">{ride.estimatedDurationMin || 15} min</span>
           </div>
         </div>
       </div>
 
       {/* Rate Passenger Card */}
-      <div className="rounded-2xl border border-[#E5E5E5] bg-white p-3.5 space-y-3 text-left shadow-2xs">
+      <div className="rounded-card border border-line bg-white p-3.5 space-y-3 text-left ">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-bold text-[#111111]">
+          <p className="text-xs font-bold text-ink">
             Rate Passenger ({ride.passengerName || 'Passenger'})
           </p>
           {ratingSubmitted && (
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold text-success bg-emerald-50 px-2 py-0.5 rounded-full">
               Submitted ✓
             </span>
           )}
@@ -343,7 +343,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
                   <Star
                     className={`h-6 w-6 ${
                       star <= ratingVal
-                        ? 'fill-[#FFC107] text-[#FFC107]'
+                        ? 'fill-primary text-primary'
                         : 'text-neutral-200'
                     }`}
                   />
@@ -360,10 +360,10 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-all ${
                       isSelected
-                        ? 'bg-[#111111] text-[#FFC107] shadow-xs'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        ? 'bg-ink text-white shadow-card'
+                        : 'bg-surface-2 text-ink-2 hover:bg-neutral-200'
                     }`}
                   >
                     {isSelected ? `✓ ${tag}` : `+ ${tag}`}
@@ -377,13 +377,13 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
               type="button"
               onClick={handleSubmitPassengerRating}
               disabled={isSubmittingRating}
-              className="w-full rounded-xl bg-neutral-100 py-2 text-xs font-bold text-[#111111] hover:bg-neutral-200 transition-all"
+              className="w-full rounded-full bg-surface-2 py-2 text-xs font-bold text-ink hover:bg-neutral-200 transition-all"
             >
               {isSubmittingRating ? 'Saving Rating...' : 'Submit Passenger Rating'}
             </button>
           </>
         ) : (
-          <p className="text-center text-xs text-neutral-500 py-1">
+          <p className="text-center text-xs text-ink-3 py-1">
             Thank you for helping keep the ZAKA community safe and rated!
           </p>
         )}
@@ -394,7 +394,7 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
         id="btn-driver-back-home"
         type="button"
         onClick={onBackToHome}
-        className="w-full rounded-2xl bg-[#FFC107] py-3.5 text-xs sm:text-sm font-black text-[#111111] shadow-md hover:bg-[#FFB300] active:scale-[0.99] transition-all"
+        className="w-full rounded-full bg-primary py-3.5 text-xs sm:text-sm font-bold text-ink shadow-card hover:bg-primary-hover active:bg-primary-pressed active:scale-[0.99] transition-all"
       >
         Back to Driver Home • Ready for Trips
       </button>

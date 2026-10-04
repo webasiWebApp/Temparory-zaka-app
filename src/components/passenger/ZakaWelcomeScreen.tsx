@@ -42,12 +42,12 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
           <defs>
             <linearGradient id="trailGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#FFA24C" stopOpacity="0.9" />
-              <stop offset="50%" stopColor="#FF7A00" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#ff860d" stopOpacity="0.8" />
               <stop offset="100%" stopColor="#FF5500" stopOpacity="0" />
             </linearGradient>
             <linearGradient id="trailGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor="#FFC87A" stopOpacity="0.9" />
-              <stop offset="50%" stopColor="#FF7A00" stopOpacity="0.85" />
+              <stop offset="50%" stopColor="#ff860d" stopOpacity="0.85" />
               <stop offset="100%" stopColor="#FF3300" stopOpacity="0" />
             </linearGradient>
             <filter id="trailGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -74,7 +74,7 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
           <path
             d="M -60 480 Q 180 520, 240 590 T 520 740"
             fill="none"
-            stroke="#FF7A00"
+            stroke="#ff860d"
             strokeWidth="8"
             strokeLinecap="round"
             className="opacity-25"
@@ -94,7 +94,7 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
           <path
             d="M 640 510 Q 420 540, 350 610 T 60 760"
             fill="none"
-            stroke="#FF7A00"
+            stroke="#ff860d"
             strokeWidth="7"
             strokeLinecap="round"
             className="opacity-20"
@@ -115,16 +115,16 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
 
       {/* 4. Ambient Luminous Static Embers */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute left-[18%] bottom-[32%] w-1.5 h-1.5 rounded-full bg-[#FFB866] shadow-[0_0_8px_#FF7A00] opacity-70" />
-        <div className="absolute left-[34%] bottom-[28%] w-1 h-1 rounded-full bg-[#FFA333] shadow-[0_0_6px_#FF7A00] opacity-60" />
-        <div className="absolute left-[62%] bottom-[35%] w-2 h-2 rounded-full bg-[#FF7A00] shadow-[0_0_10px_#FF7A00] opacity-80" />
-        <div className="absolute left-[78%] bottom-[30%] w-1.5 h-1.5 rounded-full bg-[#FFC580] shadow-[0_0_8px_#FF7A00] opacity-70" />
-        <div className="absolute left-[48%] bottom-[24%] w-1 h-1 rounded-full bg-[#FFA033] shadow-[0_0_6px_#FF7A00] opacity-60" />
+        <div className="absolute left-[18%] bottom-[32%] w-1.5 h-1.5 rounded-full bg-[#FFB866] opacity-70" />
+        <div className="absolute left-[34%] bottom-[28%] w-1 h-1 rounded-full bg-[#FFA333] opacity-60" />
+        <div className="absolute left-[62%] bottom-[35%] w-2 h-2 rounded-full bg-primary opacity-80" />
+        <div className="absolute left-[78%] bottom-[30%] w-1.5 h-1.5 rounded-full bg-[#FFC580] opacity-70" />
+        <div className="absolute left-[48%] bottom-[24%] w-1 h-1 rounded-full bg-[#FFA033] opacity-60" />
       </div>
       
       {/* 5. Subtle Dotted Africa Map in the upper-right background */}
       <div className="absolute top-12 right-2 sm:right-8 w-64 sm:w-80 h-72 sm:h-96 pointer-events-none opacity-45 mix-blend-screen select-none">
-        <svg viewBox="0 0 160 190" className="w-full h-full fill-[#FF7A00]">
+        <svg viewBox="0 0 160 190" className="w-full h-full fill-primary">
           {/* North Africa / Sahara / Mediterranean coast */}
           <circle cx="20" cy="18" r="1.5" /><circle cx="28" cy="17" r="1.5" /><circle cx="36" cy="16" r="1.5" /><circle cx="44" cy="15" r="1.5" /><circle cx="52" cy="15" r="1.5" /><circle cx="60" cy="16" r="1.5" /><circle cx="68" cy="18" r="1.5" /><circle cx="76" cy="20" r="1.5" /><circle cx="84" cy="20" r="1.5" /><circle cx="92" cy="22" r="1.5" />
           <circle cx="16" cy="26" r="1.5" /><circle cx="24" cy="25" r="1.5" /><circle cx="32" cy="24" r="1.5" /><circle cx="40" cy="23" r="1.5" /><circle cx="48" cy="23" r="1.5" /><circle cx="56" cy="24" r="1.5" /><circle cx="64" cy="26" r="1.5" /><circle cx="72" cy="27" r="1.5" /><circle cx="80" cy="28" r="1.5" /><circle cx="88" cy="29" r="1.5" /><circle cx="96" cy="30" r="1.5" />
@@ -198,7 +198,7 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
               {/* Orange Location Pin Accent in apex of A */}
               <path
                 d="M 118 28 C 120.8 28 123 30.2 123 33 C 123 36.8 118 42 118 42 C 118 42 113 36.8 113 33 C 113 30.2 115.2 28 118 28 Z"
-                fill="#FF7A00"
+                fill="#ff860d"
               />
               <circle cx="118" cy="33" r="1.5" fill="#FFFFFF" />
 
@@ -222,7 +222,7 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
               {/* Orange Location Pin Accent in apex of A */}
               <path
                 d="M 242 28 C 244.8 28 247 30.2 247 33 C 247 36.8 242 42 242 42 C 242 42 237 36.8 237 33 C 237 30.2 239.2 28 242 28 Z"
-                fill="#FF7A00"
+                fill="#ff860d"
               />
               <circle cx="242" cy="33" r="1.5" fill="#FFFFFF" />
             </svg>
@@ -241,7 +241,7 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
             id="btn-welcome-signin"
             type="button"
             onClick={onSignIn}
-            className="w-full h-13.5 sm:h-14 flex items-center justify-center rounded-2xl bg-[#FF7A00] hover:bg-[#e66e00] active:scale-[0.98] text-white font-bold text-base sm:text-[17px] shadow-[0_8px_24px_rgba(255,122,0,0.35)] transition-all cursor-pointer tracking-normal"
+            className="w-full h-13.5 sm:h-14 flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover active:bg-primary-pressed active:scale-[0.98] text-on-primary font-bold text-base sm:text-[17px] transition-all cursor-pointer tracking-normal"
           >
             Sign in
           </button>
@@ -251,7 +251,7 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
             id="btn-welcome-signup"
             type="button"
             onClick={onSignUp}
-            className="w-full h-13.5 sm:h-14 flex items-center justify-center rounded-2xl bg-black/60 hover:bg-black/75 active:scale-[0.98] border border-white/20 hover:border-white/35 text-white font-semibold text-base sm:text-[17px] backdrop-blur-md transition-all cursor-pointer tracking-normal shadow-sm"
+            className="w-full h-13.5 sm:h-14 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/75 active:scale-[0.98] border border-white/20 hover:border-white/35 text-white font-semibold text-base sm:text-[17px] backdrop-blur-md transition-all cursor-pointer tracking-normal "
           >
             Create account
           </button>

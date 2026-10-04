@@ -347,32 +347,32 @@ export const DriverPendingScreen: React.FC = () => {
   return (
     <div
       id="driver-pending-scroll-container"
-      className="relative flex-1 w-full h-full min-h-0 overflow-y-auto overscroll-contain bg-[#F4F5F7] p-3 sm:p-6 py-6 sm:py-8"
+      className="relative flex-1 w-full h-full min-h-0 overflow-y-auto overscroll-contain bg-white p-3 sm:p-6 py-6 sm:py-8"
     >
-      <div className="mx-auto w-full max-w-2xl space-y-5 rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-xl sm:p-8">
+      <div className="mx-auto w-full max-w-2xl space-y-5 rounded-card border border-line bg-white p-5 shadow-raised sm:p-8">
         {/* Email Verification Banner */}
         {!isEmailVerified && (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-2xs space-y-3">
+          <div className="rounded-card border border-amber-300 bg-amber-50/90 p-4 space-y-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FF7A00] text-white shadow-xs">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-card">
                 <Mail className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-[#111111]">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-ink">
                     Verification email sent
                   </h3>
-                  <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[9px] font-black text-amber-950 uppercase">
+                  <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-950 uppercase">
                     Action Required
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-neutral-700 leading-relaxed font-medium">
-                  Please check your email (<span className="font-bold text-[#111111]">{currentUser?.email || userProfile?.email || 'your registered email'}</span>) and verify your email address.
+                <p className="mt-1 text-xs text-ink-2 leading-relaxed font-medium">
+                  Please check your email (<span className="font-bold text-ink">{currentUser?.email || userProfile?.email || 'your registered email'}</span>) and verify your email address.
                 </p>
                 {resendFeedback && (
                   <p
                     className={`mt-1.5 text-xs font-semibold ${
-                      resendFeedback.type === 'success' ? 'text-emerald-700' : 'text-red-700'
+                      resendFeedback.type === 'success' ? 'text-success' : 'text-danger'
                     }`}
                   >
                     {resendFeedback.message}
@@ -386,7 +386,7 @@ export const DriverPendingScreen: React.FC = () => {
                 type="button"
                 onClick={handleResendEmail}
                 disabled={isResendingEmail || resendCooldown > 0}
-                className="flex items-center gap-1.5 rounded-xl bg-white border border-amber-300 px-3 py-1.5 text-xs font-bold text-[#111111] shadow-2xs hover:bg-neutral-50 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-full bg-white border border-amber-300 px-3 py-1.5 text-xs font-bold text-ink hover:bg-surface-2 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isResendingEmail ? 'animate-spin' : ''}`} />
                 <span>
@@ -402,9 +402,9 @@ export const DriverPendingScreen: React.FC = () => {
                 type="button"
                 onClick={handleCheckEmailStatus}
                 disabled={isCheckingEmail}
-                className="flex items-center gap-1.5 rounded-xl bg-[#111111] px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-neutral-800 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-xs font-bold text-white shadow-card hover:bg-ink active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#FFC107]" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary-text" />
                 <span>{isCheckingEmail ? 'Checking...' : "I've verified my email"}</span>
               </button>
             </div>
@@ -415,14 +415,14 @@ export const DriverPendingScreen: React.FC = () => {
         <div className="text-center space-y-2">
           <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
             {isRejected ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+              <div className="flex h-16 w-16 items-center justify-center rounded-card bg-red-100 text-danger">
                 <AlertTriangle className="h-8 w-8" />
               </div>
             ) : (
               <>
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-2xl bg-amber-300/40" />
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FFC107] text-[#111111] shadow-md">
-                  <Clock className="h-8 w-8 text-[#111111]" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-card bg-amber-300/40" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-card bg-primary text-ink shadow-card">
+                  <Clock className="h-8 w-8 text-ink" />
                 </div>
               </>
             )}
@@ -430,7 +430,7 @@ export const DriverPendingScreen: React.FC = () => {
 
           <div>
             <span
-              className={`inline-block rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
+              className={`inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${
                 isRejected
                   ? 'bg-red-100 text-red-800 border border-red-200'
                   : 'bg-amber-100 text-amber-900 border border-amber-200'
@@ -438,12 +438,12 @@ export const DriverPendingScreen: React.FC = () => {
             >
               {isRejected ? 'Application Status: Requires Attention' : 'Application Status: In Verification'}
             </span>
-            <h2 className="mt-2 text-xl font-black text-[#111111]">
+            <h2 className="mt-2 text-xl font-bold text-ink">
               {isRejected
                 ? 'Driver Application Not Approved'
                 : 'South African Driver Verification'}
             </h2>
-            <p className="mt-1 text-xs text-neutral-600 leading-relaxed max-w-lg mx-auto">
+            <p className="mt-1 text-xs text-ink-2 leading-relaxed max-w-lg mx-auto">
               {isRejected
                 ? (driverProfile?.rejectionReason || 'Our fleet compliance team could not verify some of your details. Review the documents below or re-upload clearer photos.')
                 : 'Welcome to ZAKA! In accordance with the National Land Transport Act and passenger safety standards, please upload the required verification credentials below.'}
@@ -453,36 +453,36 @@ export const DriverPendingScreen: React.FC = () => {
 
         {/* Registered Vehicle Card */}
         {driverProfile?.vehicle && (
-          <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3.5 flex items-center justify-between">
+          <div className="rounded-card border border-line bg-surface-2 p-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFC107] text-[#111111]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-ink">
                 <Car className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-[#111111]">
+                <p className="text-xs font-bold text-ink">
                   {driverProfile.vehicle.colour} {driverProfile.vehicle.make} {driverProfile.vehicle.model}
                 </p>
-                <p className="text-[11px] font-mono text-neutral-500">
+                <p className="text-[11px] font-mono text-ink-3">
                   {driverProfile.vehicle.registrationNumber} • {driverProfile.vehicle.vehicleType.toUpperCase()} Class
                 </p>
               </div>
             </div>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 uppercase">
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 uppercase">
               Registered
             </span>
           </div>
         )}
 
         {/* Documents Upload Section */}
-        <div className="space-y-3 rounded-2xl border border-[#E5E5E5] bg-white p-4">
-          <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-2">
+        <div className="space-y-3 rounded-card border border-line bg-white p-4">
+          <div className="flex items-center justify-between border-b border-line pb-2">
             <div>
-              <span className="text-xs font-black uppercase tracking-wider text-[#111111]">
+              <span className="text-xs font-bold uppercase tracking-wider text-ink">
                 Required Verification Documents
               </span>
-              <p className="text-[11px] text-neutral-500">Accepted formats: PDF, JPG, PNG, WEBP (Max 10MB)</p>
+              <p className="text-[11px] text-ink-3">Accepted formats: PDF, JPG, PNG, WEBP (Max 10MB)</p>
             </div>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-surface-2 text-ink-2">
               {uploadedCount} of {REQUIRED_DOCS.length} Uploaded
             </span>
           </div>
@@ -499,19 +499,19 @@ export const DriverPendingScreen: React.FC = () => {
               return (
                 <div
                   key={docItem.type}
-                  className="rounded-xl border border-[#E5E5E5] p-3.5 hover:border-neutral-300 transition-colors bg-[#FAFAFA]"
+                  className="rounded-xl border border-line p-3.5 hover:border-neutral-300 transition-colors bg-surface-2"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-start gap-3">
                       <div
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                           isDocApproved
-                            ? 'bg-emerald-100 text-emerald-700'
+                            ? 'bg-emerald-100 text-success'
                             : isDocRejected
-                            ? 'bg-red-100 text-red-700'
+                            ? 'bg-red-100 text-danger'
                             : existingRecord
                             ? 'bg-amber-100 text-amber-800'
-                            : 'bg-neutral-100 text-neutral-500'
+                            : 'bg-surface-2 text-ink-3'
                         }`}
                       >
                         {isDocApproved ? (
@@ -527,16 +527,16 @@ export const DriverPendingScreen: React.FC = () => {
 
                       <div>
                         <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-bold text-[#111111]">{docItem.title}</h4>
+                          <h4 className="text-xs font-bold text-ink">{docItem.title}</h4>
                           <span
-                            className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                            className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                               isDocApproved
                                 ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                 : isDocRejected
                                 ? 'bg-red-100 text-red-800 border-red-300'
                                 : existingRecord
                                 ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                : 'bg-neutral-100 text-neutral-600 border-neutral-300'
+                                : 'bg-surface-2 text-ink-2 border-neutral-300'
                             }`}
                           >
                             {isDocApproved
@@ -548,9 +548,9 @@ export const DriverPendingScreen: React.FC = () => {
                               : 'Missing'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-neutral-500 line-clamp-1">{docItem.description}</p>
+                        <p className="text-[11px] text-ink-3 line-clamp-1">{docItem.description}</p>
                         {existingRecord && (
-                          <p className="text-[10px] text-neutral-400 mt-0.5">
+                          <p className="text-[11px] text-neutral-400 mt-0.5">
                             Uploaded: {existingRecord.fileName} •{' '}
                             {existingRecord.fileSizeBytes
                               ? `${(existingRecord.fileSizeBytes / 1024).toFixed(0)} KB`
@@ -558,7 +558,7 @@ export const DriverPendingScreen: React.FC = () => {
                           </p>
                         )}
                         {isDocRejected && existingRecord.rejectionReason && (
-                          <p className="text-[11px] font-bold text-red-600 mt-1">
+                          <p className="text-[11px] font-bold text-danger mt-1">
                             Reason: {existingRecord.rejectionReason}
                           </p>
                         )}
@@ -571,7 +571,7 @@ export const DriverPendingScreen: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenPreview(existingRecord)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[#E5E5E5] bg-white px-2.5 py-1.5 text-[11px] font-bold text-neutral-700 hover:bg-neutral-50 shadow-sm cursor-pointer"
+                          className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1.5 text-[11px] font-bold text-ink-2 hover:bg-surface-2 cursor-pointer"
                           title="Preview Document"
                         >
                           <Eye className="h-3 w-3" />
@@ -595,12 +595,12 @@ export const DriverPendingScreen: React.FC = () => {
                       <button
                         onClick={() => fileInputRefs.current[docItem.type]?.click()}
                         disabled={isBusy}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold shadow-sm transition-all ${
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold shadow-card transition-all ${
                           isBusy
                             ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
                             : existingRecord
-                            ? 'border border-[#E5E5E5] bg-white text-[#111111] hover:bg-neutral-50'
-                            : 'bg-[#FFC107] text-[#111111] hover:bg-[#FFB300]'
+                            ? 'border border-line bg-white text-ink hover:bg-surface-2'
+                            : 'bg-primary text-ink hover:bg-primary-hover active:bg-primary-pressed'
                         }`}
                       >
                         <Upload className="h-3 w-3" />
@@ -616,7 +616,7 @@ export const DriverPendingScreen: React.FC = () => {
                         <FileText className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                         <span className="truncate">Selected: {state.fileName || 'Document'}</span>
                       </div>
-                      <span className="text-[10px] text-blue-600 font-semibold shrink-0">Selected</span>
+                      <span className="text-[11px] text-blue-600 font-semibold shrink-0">Selected</span>
                     </div>
                   )}
 
@@ -631,13 +631,13 @@ export const DriverPendingScreen: React.FC = () => {
                   {/* Phase 3: Real Upload Progress */}
                   {state.phase === 'UPLOADING' && (
                     <div className="mt-2.5 space-y-1">
-                      <div className="flex justify-between text-[10px] text-neutral-600">
+                      <div className="flex justify-between text-[11px] text-ink-2">
                         <span className="font-semibold">Uploading to secure Firebase Storage...</span>
                         <span className="font-bold">{state.progress}%</span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200">
                         <div
-                          className="h-full bg-[#FFC107] transition-all duration-150"
+                          className="h-full bg-primary transition-all duration-150"
                           style={{ width: `${Math.max(state.progress, 5)}%` }}
                         />
                       </div>
@@ -647,7 +647,7 @@ export const DriverPendingScreen: React.FC = () => {
                   {/* Phase 4: Uploaded confirmation */}
                   {state.phase === 'UPLOADED' && (
                     <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-emerald-50 p-2 text-[11px] font-bold text-emerald-800 border border-emerald-200">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                       <span>Document uploaded successfully to Firebase Storage.</span>
                     </div>
                   )}
@@ -655,15 +655,15 @@ export const DriverPendingScreen: React.FC = () => {
                   {/* Phase 5: Failed with clear error and retry */}
                   {state.phase === 'FAILED' && state.error && (
                     <div className="mt-2 rounded-xl bg-red-50 p-2.5 border border-red-200 space-y-1.5">
-                      <div className="flex items-start gap-2 text-[11px] font-bold text-red-700">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                      <div className="flex items-start gap-2 text-[11px] font-bold text-danger">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-danger mt-0.5" />
                         <span className="flex-1">{state.error}</span>
                       </div>
                       <div className="flex items-center gap-2 pt-0.5">
                         <button
                           type="button"
                           onClick={() => fileInputRefs.current[docItem.type]?.click()}
-                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-[11px] font-black text-red-700 border border-red-300 shadow-xs hover:bg-red-50"
+                          className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-danger border border-red-300 hover:bg-red-50"
                         >
                           <RefreshCw className="h-3 w-3" />
                           <span>Retry Upload</span>
@@ -676,7 +676,7 @@ export const DriverPendingScreen: React.FC = () => {
                               [docItem.type]: { phase: 'IDLE', progress: 0 },
                             }))
                           }
-                          className="text-[10px] font-bold text-neutral-500 hover:text-neutral-700"
+                          className="text-[11px] font-bold text-ink-3 hover:text-ink-2"
                         >
                           Dismiss
                         </button>
@@ -695,7 +695,7 @@ export const DriverPendingScreen: React.FC = () => {
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-3 text-xs font-bold text-[#111111] hover:bg-neutral-100 transition-all active:scale-[0.99]"
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface-2 py-3 text-xs font-bold text-ink hover:bg-surface-2 transition-all active:scale-[0.99]"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>{isRefreshing ? 'Checking Status with Firestore...' : 'Refresh Status'}</span>
@@ -704,11 +704,11 @@ export const DriverPendingScreen: React.FC = () => {
 
         {/* Footer info & Logout */}
         {signOutError && (
-          <div className="text-xs text-red-600 bg-red-50 p-2 rounded-xl text-center font-bold">
+          <div className="text-xs text-danger bg-red-50 p-2 rounded-xl text-center font-bold">
             {signOutError}
           </div>
         )}
-        <div className="flex items-center justify-between border-t border-[#E5E5E5] pt-3 text-xs text-neutral-500">
+        <div className="flex items-center justify-between border-t border-line pt-3 text-xs text-ink-3">
           <span>Logged in as {userProfile?.name || 'Driver'}</span>
           <button
             disabled={isSigningOut}
@@ -720,7 +720,7 @@ export const DriverPendingScreen: React.FC = () => {
                 setSignOutError(err?.message || 'Failed to sign out.');
               }
             }}
-            className="flex items-center gap-1 font-bold text-red-600 hover:underline disabled:opacity-50"
+            className="flex items-center gap-1 font-bold text-danger hover:underline disabled:opacity-50"
           >
             <LogOut className="h-3.5 w-3.5" />
             <span>{isSigningOut ? 'Signing Out...' : 'Sign Out'}</span>
@@ -740,13 +740,13 @@ export const DriverPendingScreen: React.FC = () => {
               setPreviewError(null);
             }
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
         >
-          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between border-b border-[#E5E5E5] p-4">
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-[20px] bg-white shadow-modal flex flex-col">
+            <div className="flex items-center justify-between border-b border-line p-4">
               <div>
-                <h3 className="text-sm font-bold text-[#111111]">{previewDoc.title}</h3>
-                <p className="text-[11px] text-neutral-500">{resolvedPreview?.fileName || previewDoc.fileName}</p>
+                <h3 className="text-sm font-bold text-ink">{previewDoc.title}</h3>
+                <p className="text-[11px] text-ink-3">{resolvedPreview?.fileName || previewDoc.fileName}</p>
               </div>
               <button
                 type="button"
@@ -755,25 +755,25 @@ export const DriverPendingScreen: React.FC = () => {
                   setResolvedPreview(null);
                   setPreviewError(null);
                 }}
-                className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 cursor-pointer"
+                className="rounded-full p-1.5 text-ink-3 hover:bg-surface-2 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-neutral-50 min-h-[300px]">
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-surface-2 min-h-[300px]">
               {previewLoading && !resolvedPreview ? (
                 <div className="flex flex-col items-center gap-2 p-8">
-                  <RefreshCw className="h-6 w-6 animate-spin text-[#FF7A00]" />
-                  <span className="text-xs font-semibold text-neutral-600">Loading document...</span>
+                  <RefreshCw className="h-6 w-6 animate-spin text-primary-text" />
+                  <span className="text-xs font-semibold text-ink-2">Loading document...</span>
                 </div>
               ) : previewError ? (
                 <div className="text-center p-6 space-y-3">
                   <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
-                  <p className="text-xs text-red-600 font-bold">{previewError}</p>
+                  <p className="text-xs text-danger font-bold">{previewError}</p>
                   <button
                     type="button"
                     onClick={() => handleOpenPreview(previewDoc)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-300 bg-white px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-bold text-ink-2 hover:bg-surface-2"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                     <span>Retry</span>
@@ -784,19 +784,19 @@ export const DriverPendingScreen: React.FC = () => {
                   <object
                     data={resolvedPreview.url}
                     type="application/pdf"
-                    className="w-full h-[55vh] rounded-xl border border-neutral-300 bg-white shadow-xs"
+                    className="w-full h-[55vh] rounded-xl border border-neutral-300 bg-white "
                   >
                     <div className="text-center space-y-3 p-6">
                       <FileText className="h-16 w-16 text-neutral-400 mx-auto" />
-                      <p className="text-xs font-bold text-neutral-700">PDF Document Attached</p>
+                      <p className="text-xs font-bold text-ink-2">PDF Document Attached</p>
                       <a
                         href={resolvedPreview.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#111111] px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-neutral-800"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-xs font-bold text-white shadow-card hover:bg-ink"
                       >
                         <span>Open in New Tab</span>
-                        <ArrowRight className="h-3.5 w-3.5 text-[#FFC107]" />
+                        <ArrowRight className="h-3.5 w-3.5 text-primary-text" />
                       </a>
                     </div>
                   </object>
@@ -805,20 +805,20 @@ export const DriverPendingScreen: React.FC = () => {
                 <img
                   src={resolvedPreview.url}
                   alt={previewDoc.title}
-                  className="max-h-[60vh] max-w-full rounded-xl object-contain shadow-md"
+                  className="max-h-[60vh] max-w-full rounded-xl object-contain shadow-card"
                   onError={() => setPreviewError('Unable to display image. The file may be corrupt or inaccessible.')}
                 />
               ) : null}
             </div>
             {resolvedPreview?.url && (
-              <div className="flex items-center justify-between border-t border-[#E5E5E5] px-4 py-3 bg-white">
+              <div className="flex items-center justify-between border-t border-line px-4 py-3 bg-white">
                 <a
                   href={resolvedPreview.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-700 hover:text-[#111111]"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-ink-2 hover:text-ink"
                 >
-                  <ArrowRight className="h-3.5 w-3.5 text-[#FFC107]" />
+                  <ArrowRight className="h-3.5 w-3.5 text-primary-text" />
                   <span>Open in New Tab</span>
                 </a>
                 <button
@@ -828,7 +828,7 @@ export const DriverPendingScreen: React.FC = () => {
                     setResolvedPreview(null);
                     setPreviewError(null);
                   }}
-                  className="rounded-xl border border-neutral-300 bg-white px-3 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 cursor-pointer"
+                  className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-bold text-ink-2 hover:bg-surface-2 cursor-pointer"
                 >
                   Close
                 </button>

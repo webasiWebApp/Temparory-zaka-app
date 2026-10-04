@@ -121,39 +121,39 @@ export const VerifyEmailScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#F7F7F5] px-4 py-8 select-none text-[#111111]">
-      <div className="w-full max-w-md space-y-6 rounded-[32px] border border-white/90 bg-white/95 backdrop-blur-2xl p-6 sm:p-8 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-white px-4 py-8 select-none text-ink">
+      <div className="w-full max-w-md space-y-6 rounded-card bg-white p-6 sm:p-8 shadow-card">
         {/* Brand Icon Header */}
         <div className="text-center space-y-3">
           <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-3xl bg-amber-400/25" />
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-[#FF7A00] to-[#FFA000] text-white shadow-[0_8px_24px_rgba(255,122,0,0.32)]">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-card bg-amber-400/25" />
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-card bg-primary text-on-primary ">
               <Mail className="h-10 w-10 stroke-[2.2]" />
             </div>
           </div>
 
           <div className="space-y-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200/60 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-800">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200/60 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-800">
               <Clock className="h-3 w-3" /> Action Required
             </span>
-            <h1 className="text-2xl font-black tracking-tight text-neutral-950">
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-950">
               Verify your email
             </h1>
-            <p className="text-xs text-neutral-500 font-medium leading-relaxed max-w-xs mx-auto">
+            <p className="text-xs text-ink-3 font-medium leading-relaxed max-w-xs mx-auto">
               We've sent a verification link to your email address:
             </p>
-            <p className="text-sm font-black text-neutral-900 break-all bg-neutral-50 rounded-xl py-1.5 px-3 border border-neutral-100">
+            <p className="text-sm font-bold text-ink break-all bg-surface-2 rounded-xl py-1.5 px-3 border border-line">
               {email}
             </p>
           </div>
         </div>
 
         {/* Informational Guidance */}
-        <div className="space-y-2 rounded-2xl bg-neutral-50/80 p-3.5 border border-neutral-100 text-xs text-neutral-600">
+        <div className="space-y-2 rounded-card bg-neutral-50/80 p-3.5 border border-line text-xs text-ink-2">
           <div className="flex items-start gap-2.5">
-            <ShieldCheck className="h-4 w-4 text-[#FF7A00] shrink-0 mt-0.5" />
+            <ShieldCheck className="h-4 w-4 text-primary-text shrink-0 mt-0.5" />
             <p className="leading-snug">
-              <strong className="text-neutral-900 font-bold">Mandatory Security Verification:</strong> Unverified accounts cannot request rides, access saved payment methods, or activate driver status.
+              <strong className="text-ink font-bold">Mandatory Security Verification:</strong> Unverified accounts cannot request rides, access saved payment methods, or activate driver status.
             </p>
           </div>
           <div className="flex items-start gap-2.5">
@@ -167,18 +167,18 @@ export const VerifyEmailScreen: React.FC = () => {
         {/* Feedback Message Banner */}
         {feedback && (
           <div
-            className={`rounded-2xl p-3.5 text-xs font-semibold leading-relaxed flex items-start gap-2.5 animate-in fade-in duration-200 ${
+            className={`rounded-card p-3.5 text-xs font-semibold leading-relaxed flex items-start gap-2.5 animate-in fade-in duration-200 ${
               feedback.type === 'success'
                 ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
                 : feedback.type === 'error'
                 ? 'bg-red-50 text-red-900 border border-red-200'
-                : 'bg-neutral-100 text-neutral-800 border border-neutral-200'
+                : 'bg-surface-2 text-ink border border-line'
             }`}
           >
             {feedback.type === 'success' ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+              <AlertCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
             )}
             <div className="flex-1">{feedback.message}</div>
           </div>
@@ -191,9 +191,9 @@ export const VerifyEmailScreen: React.FC = () => {
             type="button"
             onClick={handleCheckStatus}
             disabled={isChecking}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-neutral-950 py-3.5 text-xs font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:bg-neutral-900 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-neutral-950 py-3.5 text-xs font-bold text-white shadow-raised hover:bg-ink active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 text-[#FF7A00] ${isChecking ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 text-primary-text ${isChecking ? 'animate-spin' : ''}`} />
             <span>{isChecking ? 'Checking status with Firebase...' : "I've Verified My Email — Check Status"}</span>
             <ArrowRight className="h-4 w-4 text-neutral-400 ml-1" />
           </button>
@@ -203,9 +203,9 @@ export const VerifyEmailScreen: React.FC = () => {
             type="button"
             onClick={handleResendEmail}
             disabled={isSending || resendCooldown > 0}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-neutral-200 bg-white py-3 text-xs font-bold text-neutral-800 hover:bg-neutral-50 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-line bg-white py-3 text-xs font-bold text-ink hover:bg-surface-2 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
           >
-            <Send className="h-3.5 w-3.5 text-neutral-500" />
+            <Send className="h-3.5 w-3.5 text-ink-3" />
             <span>
               {resendCooldown > 0
                 ? `Resend available in ${resendCooldown}s`
@@ -217,14 +217,14 @@ export const VerifyEmailScreen: React.FC = () => {
         </div>
 
         {/* Footer Logout */}
-        <div className="border-t border-neutral-100 pt-3 flex items-center justify-between text-xs text-neutral-400">
+        <div className="border-t border-line pt-3 flex items-center justify-between text-xs text-neutral-400">
           <span>Wrong email?</span>
           <button
             type="button"
             onClick={async () => {
               await signOut();
             }}
-            className="flex items-center gap-1.5 font-bold text-red-600 hover:underline cursor-pointer"
+            className="flex items-center gap-1.5 font-bold text-danger hover:underline cursor-pointer"
           >
             <LogOut className="h-3.5 w-3.5" />
             <span>Sign Out</span>

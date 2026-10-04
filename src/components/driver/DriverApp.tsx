@@ -540,7 +540,7 @@ export const DriverApp: React.FC = () => {
   }
 
   return (
-    <div id="driver-main-container" className="relative flex h-[calc(100vh-61px)] w-full flex-col overflow-hidden bg-[#F4F5F7] lg:flex-row">
+    <div id="driver-main-container" className="relative flex h-[calc(100vh-61px)] w-full flex-col overflow-hidden bg-white lg:flex-row">
       {/* LEFT: INTERACTIVE DRIVER RADAR & NAVIGATION MAP */}
       <div className="relative h-[42vh] w-full shrink-0 lg:h-full lg:flex-1">
         <InteractiveMap
@@ -564,10 +564,10 @@ export const DriverApp: React.FC = () => {
           <button
             id="btn-toggle-driver-online"
             onClick={handleToggleOnline}
-            className={`pointer-events-auto flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-black shadow-lg transition-all active:scale-95 ${
+            className={`pointer-events-auto flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold shadow-raised transition-all active:scale-95 ${
               isOnline
-                ? 'bg-[#111111] text-[#FFC107] border border-[#FFC107]'
-                : 'bg-white text-neutral-600 border border-[#E5E5E5]'
+                ? 'bg-ink text-white border border-primary'
+                : 'bg-white text-ink-2 border border-line'
             }`}
           >
             <Power className={`h-3.5 w-3.5 ${isOnline ? 'text-emerald-400' : 'text-neutral-400'}`} />
@@ -581,26 +581,26 @@ export const DriverApp: React.FC = () => {
 
           {/* GPS Telemetry Pill */}
           {isOnline && (
-            <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-xs text-[11px] font-bold">
+            <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-line bg-white/95 px-3 py-1.5 shadow-card backdrop-blur-xs text-[11px] font-bold">
               {isSimulatingGps ? (
                 <>
                   <Radio className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
-                  <span className="text-neutral-700">Simulated GPS (Demo)</span>
+                  <span className="text-ink-2">Simulated GPS (Demo)</span>
                   <button
                     onClick={() => setIsSimulatingGps(false)}
-                    className="ml-1 text-[10px] text-blue-600 underline font-black hover:text-blue-800"
+                    className="ml-1 text-[11px] text-blue-600 underline font-bold hover:text-blue-800"
                   >
                     Use Device GPS
                   </button>
                 </>
               ) : gpsState === 'LOCATION_GRANTED' ? (
                 <>
-                  <Satellite className="h-3.5 w-3.5 text-emerald-600" />
+                  <Satellite className="h-3.5 w-3.5 text-success" />
                   <span className="text-emerald-800">GPS Locked (High Accuracy)</span>
                   {isDemo && (
                     <button
                       onClick={() => setIsSimulatingGps(true)}
-                      className="ml-1 text-[10px] text-neutral-500 underline hover:text-neutral-800"
+                      className="ml-1 text-[11px] text-ink-3 underline hover:text-ink"
                     >
                       Simulate
                     </button>
@@ -614,7 +614,7 @@ export const DriverApp: React.FC = () => {
               ) : (
                 <>
                   <WifiOff className="h-3.5 w-3.5 text-red-500" />
-                  <span className="text-red-700">GPS Warning</span>
+                  <span className="text-danger">GPS Warning</span>
                 </>
               )}
             </div>
@@ -623,9 +623,9 @@ export const DriverApp: React.FC = () => {
 
         {/* GPS Failure Warning Banner */}
         {isOnline && !isSimulatingGps && (gpsState === 'LOCATION_DENIED' || gpsState === 'LOCATION_UNAVAILABLE' || gpsState === 'LOCATION_STALE' || gpsState === 'LOCATION_ERROR') && (
-          <div className="absolute bottom-3 left-3 right-3 z-20 rounded-2xl border border-red-200 bg-red-50 p-3 shadow-lg flex items-center justify-between gap-2 text-xs">
+          <div className="absolute bottom-3 left-3 right-3 z-20 rounded-card border border-red-200 bg-red-50 p-3 shadow-raised flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2 text-red-800">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+              <AlertCircle className="h-4 w-4 shrink-0 text-danger" />
               <span className="font-semibold">
                 {gpsErrorMsg || 'Your location is temporarily unavailable. Check GPS permissions or satellite signal.'}
               </span>
@@ -633,7 +633,7 @@ export const DriverApp: React.FC = () => {
             {isDemo && (
               <button
                 onClick={() => setIsSimulatingGps(true)}
-                className="shrink-0 rounded-xl bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-red-700"
+                className="shrink-0 rounded-full bg-danger px-2.5 py-1 text-[11px] font-bold text-white shadow-card hover:bg-red-700"
               >
                 Switch to Demo GPS
               </button>
@@ -643,17 +643,17 @@ export const DriverApp: React.FC = () => {
       </div>
 
       {/* RIGHT: DRIVER CONTROL CONSOLE / DISPATCH PANEL */}
-      <div className="z-20 flex flex-1 flex-col overflow-y-auto rounded-t-3xl border-t border-[#E5E5E5] bg-white p-3.5 sm:p-5 shadow-2xl lg:h-full lg:max-w-md lg:rounded-none lg:border-t-0 lg:border-l">
+      <div className="z-20 flex flex-1 flex-col overflow-y-auto rounded-t-sheet border-t border-line bg-white p-3.5 sm:p-5 shadow-modal lg:h-full lg:max-w-md lg:rounded-none lg:border-t-0 lg:border-l">
         {/* Toggle Online Error Alert */}
         {toggleOnlineError && (
-          <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-center justify-between gap-2">
+          <div className="mb-3 rounded-card border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+              <AlertCircle className="h-4 w-4 shrink-0 text-danger" />
               <span>{toggleOnlineError}</span>
             </div>
             <button
               onClick={() => setToggleOnlineError(null)}
-              className="font-bold text-red-600 underline text-[11px]"
+              className="font-bold text-danger underline text-[11px]"
             >
               Dismiss
             </button>
@@ -661,14 +661,14 @@ export const DriverApp: React.FC = () => {
         )}
 
         {/* Navigation Tabs (Console, Earnings, History) */}
-        <div className="mb-3.5 flex items-center justify-between rounded-xl bg-[#F5F5F5] p-1 border border-[#E5E5E5]">
+        <div className="mb-3.5 flex items-center justify-between rounded-xl bg-surface-2 p-1 border border-line">
           <button
             id="tab-driver-console"
             onClick={() => setViewTab('console')}
-            className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+            className={`flex-1 rounded-full py-1.5 text-xs font-bold transition-all ${
               viewTab === 'console'
-                ? 'bg-white text-[#111111] shadow-xs'
-                : 'text-neutral-500 hover:text-[#111111]'
+                ? 'bg-white text-ink shadow-card'
+                : 'text-ink-3 hover:text-ink'
             }`}
           >
             Console
@@ -676,10 +676,10 @@ export const DriverApp: React.FC = () => {
           <button
             id="tab-driver-earnings"
             onClick={() => setViewTab('earnings')}
-            className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+            className={`flex-1 rounded-full py-1.5 text-xs font-bold transition-all ${
               viewTab === 'earnings'
-                ? 'bg-white text-[#111111] shadow-xs'
-                : 'text-neutral-500 hover:text-[#111111]'
+                ? 'bg-white text-ink shadow-card'
+                : 'text-ink-3 hover:text-ink'
             }`}
           >
             Earnings
@@ -687,10 +687,10 @@ export const DriverApp: React.FC = () => {
           <button
             id="tab-driver-history"
             onClick={() => setViewTab('history')}
-            className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+            className={`flex-1 rounded-full py-1.5 text-xs font-bold transition-all ${
               viewTab === 'history'
-                ? 'bg-white text-[#111111] shadow-xs'
-                : 'text-neutral-500 hover:text-[#111111]'
+                ? 'bg-white text-ink shadow-card'
+                : 'text-ink-3 hover:text-ink'
             }`}
           >
             History
@@ -702,45 +702,45 @@ export const DriverApp: React.FC = () => {
           <div className="space-y-3.5">
             {/* Driver Performance Metrics HUD */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 text-center shadow-2xs">
-                <span className="block text-[9px] font-bold uppercase text-neutral-400">Today</span>
-                <span className="text-xs sm:text-sm font-black text-[#111111]">
+              <div className="rounded-card border border-line bg-surface-2 p-2.5 text-center ">
+                <span className="block text-[11px] font-bold uppercase text-neutral-400">Today</span>
+                <span className="text-xs sm:text-sm font-bold text-ink">
                   {fareService.formatZAR(earningsSummary.today.driverNetEarnings || driverProfile?.earningsToday || 0)}
                 </span>
               </div>
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 text-center shadow-2xs">
-                <span className="block text-[9px] font-bold uppercase text-neutral-400">Rating</span>
+              <div className="rounded-card border border-line bg-surface-2 p-2.5 text-center ">
+                <span className="block text-[11px] font-bold uppercase text-neutral-400">Rating</span>
                 <div className="flex items-center justify-center gap-1">
-                  <Star className="h-3 w-3 fill-[#FFC107] text-[#FFC107]" />
-                  <span className="text-xs sm:text-sm font-black text-[#111111]">
+                  <Star className="h-3 w-3 fill-primary text-primary" />
+                  <span className="text-xs sm:text-sm font-bold text-ink">
                     {driverProfile?.rating?.toFixed(1) || '5.0'}
                   </span>
                 </div>
               </div>
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 text-center shadow-2xs">
-                <span className="block text-[9px] font-bold uppercase text-neutral-400">Trips</span>
-                <span className="text-xs sm:text-sm font-black text-[#111111]">
+              <div className="rounded-card border border-line bg-surface-2 p-2.5 text-center ">
+                <span className="block text-[11px] font-bold uppercase text-neutral-400">Trips</span>
+                <span className="text-xs sm:text-sm font-bold text-ink">
                   {earningsSummary.lifetime.completedTrips || driverProfile?.totalTrips || 0}
                 </span>
               </div>
             </div>
 
             {/* Vehicle & Verification Card */}
-            <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3 flex items-center justify-between shadow-2xs">
+            <div className="rounded-card border border-line bg-surface-2 p-3 flex items-center justify-between ">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFC107] text-[#111111] font-bold shrink-0">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-ink font-bold shrink-0">
                   <Car className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#111111] truncate">
+                  <p className="text-xs font-bold text-ink truncate">
                     {driverProfile?.vehicle?.colour || 'Silver'} {driverProfile?.vehicle?.make || 'Toyota'} {driverProfile?.vehicle?.model || 'Corolla'}
                   </p>
-                  <p className="font-mono text-[10px] text-neutral-500 font-semibold">
+                  <p className="font-mono text-[11px] text-ink-3 font-semibold">
                     {driverProfile?.vehicle?.registrationNumber || 'ZK 89 GP'}
                   </p>
                 </div>
               </div>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[9px] font-bold text-emerald-800 shrink-0">
+              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 shrink-0">
                 APPROVED
               </span>
             </div>
@@ -766,11 +766,11 @@ export const DriverApp: React.FC = () => {
               /* CASE 3: INCOMING RIDE REQUESTS ON RADAR WITH 15S AUTO DISPATCH */
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-xs font-bold text-success flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-success animate-ping" />
                     Incoming Requests ({incomingRequests.length})
                   </span>
-                  <span className="text-[10px] text-neutral-400 font-bold">15S AUTO DISPATCH</span>
+                  <span className="text-[11px] text-neutral-400 font-bold">15S AUTO DISPATCH</span>
                 </div>
 
                 {incomingRequests.map((req) => (
@@ -786,29 +786,29 @@ export const DriverApp: React.FC = () => {
               </div>
             ) : (
               /* CASE 4: ONLINE RADAR SCANNING */
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-6 text-center shadow-2xs">
+              <div className="rounded-card border border-line bg-surface-2 p-6 text-center ">
                 {isOnline ? (
                   <>
                     <div className="relative mx-auto mb-3 flex h-14 w-14 items-center justify-center">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/30" />
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success text-white shadow-card">
                         <Navigation className="h-5 w-5" />
                       </div>
                     </div>
-                    <h3 className="text-xs sm:text-sm font-bold text-[#111111]">
+                    <h3 className="text-xs sm:text-sm font-bold text-ink">
                       Searching for nearby ride requests...
                     </h3>
-                    <p className="mt-1 text-[11px] text-neutral-500 max-w-xs mx-auto">
+                    <p className="mt-1 text-[11px] text-ink-3 max-w-xs mx-auto">
                       Stay in high-demand zones around Sandton, Rosebank, and the Airport to receive trips swiftly.
                     </p>
                   </>
                 ) : (
                   <>
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-200 text-neutral-500">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-200 text-ink-3">
                       <Power className="h-5 w-5" />
                     </div>
-                    <h3 className="text-xs sm:text-sm font-bold text-[#111111]">You are currently Offline</h3>
-                    <p className="mt-1 text-[11px] text-neutral-500 max-w-xs mx-auto">
+                    <h3 className="text-xs sm:text-sm font-bold text-ink">You are currently Offline</h3>
+                    <p className="mt-1 text-[11px] text-ink-3 max-w-xs mx-auto">
                       Tap the online button above to begin receiving passenger dispatch requests.
                     </p>
                   </>
@@ -822,26 +822,26 @@ export const DriverApp: React.FC = () => {
         {viewTab === 'earnings' && (
           <div className="space-y-3.5">
             {/* Total Balance Card */}
-            <div className="rounded-2xl border border-[#111111] bg-[#111111] p-4 text-white shadow-md">
+            <div className="rounded-card border border-ink bg-ink p-4 text-white shadow-card">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFC107]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-primary-text">
                   Net Driver Earnings (85%)
                 </span>
-                <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[9px] font-bold text-neutral-300">
+                <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] font-bold text-neutral-300">
                   {earningsSummary.lifetime.completedTrips} Trips Settled
                 </span>
               </div>
-              <h2 className="mt-1 text-2xl sm:text-3xl font-black tracking-tight text-white">
+              <h2 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-white">
                 {fareService.formatZAR(earningsSummary.lifetime.driverNetEarnings || driverProfile?.totalEarnings || 0)}
               </h2>
 
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-neutral-800 pt-2 text-[11px] text-neutral-400">
                 <div>
-                  <span className="text-[10px] block">Gross Passenger Fares</span>
+                  <span className="text-[11px] block">Gross Passenger Fares</span>
                   <span className="font-bold text-white">{fareService.formatZAR(earningsSummary.lifetime.grossEarnings)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] block">ZAKA Platform Fee (15%)</span>
+                  <span className="text-[11px] block">ZAKA Platform Fee (15%)</span>
                   <span className="font-bold text-neutral-300">-{fareService.formatZAR(earningsSummary.lifetime.grossEarnings * 0.15)}</span>
                 </div>
               </div>
@@ -849,21 +849,21 @@ export const DriverApp: React.FC = () => {
 
             {/* Timeframe Quick Stats */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 shadow-2xs text-center">
-                <span className="text-[9px] font-bold uppercase text-neutral-400">Today</span>
-                <p className="mt-0.5 text-xs sm:text-sm font-black text-[#111111]">
+              <div className="rounded-card border border-line bg-surface-2 p-2.5 text-center">
+                <span className="text-[11px] font-bold uppercase text-neutral-400">Today</span>
+                <p className="mt-0.5 text-xs sm:text-sm font-bold text-ink">
                   {fareService.formatZAR(earningsSummary.today.driverNetEarnings)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 shadow-2xs text-center">
-                <span className="text-[9px] font-bold uppercase text-neutral-400">This Week</span>
-                <p className="mt-0.5 text-xs sm:text-sm font-black text-[#111111]">
+              <div className="rounded-card border border-line bg-surface-2 p-2.5 text-center">
+                <span className="text-[11px] font-bold uppercase text-neutral-400">This Week</span>
+                <p className="mt-0.5 text-xs sm:text-sm font-bold text-ink">
                   {fareService.formatZAR(earningsSummary.thisWeek.driverNetEarnings)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 shadow-2xs text-center">
-                <span className="text-[9px] font-bold uppercase text-neutral-400">This Month</span>
-                <p className="mt-0.5 text-xs sm:text-sm font-black text-[#111111]">
+              <div className="rounded-card border border-line bg-surface-2 p-2.5 text-center">
+                <span className="text-[11px] font-bold uppercase text-neutral-400">This Month</span>
+                <p className="mt-0.5 text-xs sm:text-sm font-bold text-ink">
                   {fareService.formatZAR(earningsSummary.thisMonth.driverNetEarnings)}
                 </p>
               </div>
@@ -871,12 +871,12 @@ export const DriverApp: React.FC = () => {
 
             {/* Pending Settlement Alert (Unconfirmed rides) */}
             {earningsSummary.pendingSettlement > 0 && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+              <div className="rounded-card border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold">Pending Settlement</span>
-                    <span className="font-black text-amber-950">
+                    <span className="font-bold text-amber-950">
                       {fareService.formatZAR(earningsSummary.pendingSettlement)}
                     </span>
                   </div>
@@ -888,27 +888,27 @@ export const DriverApp: React.FC = () => {
             )}
 
             {/* Payment Method Split */}
-            <div className="rounded-2xl border border-[#E5E5E5] bg-white p-3.5 space-y-2 text-xs shadow-2xs">
-              <h4 className="font-bold text-[#111111] flex items-center gap-1.5">
-                <Banknote className="h-4 w-4 text-neutral-500" />
+            <div className="rounded-card border border-line bg-white p-3.5 space-y-2 text-xs ">
+              <h4 className="font-bold text-ink flex items-center gap-1.5">
+                <Banknote className="h-4 w-4 text-ink-3" />
                 Payment Channels Breakdown
               </h4>
               <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-neutral-600">
+                <div className="flex items-center justify-between text-ink-2">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="h-2 w-2 rounded-full bg-success" />
                     Direct Cash Received:
                   </span>
-                  <span className="font-black text-[#111111]">
+                  <span className="font-bold text-ink">
                     {fareService.formatZAR(cashEarnings)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-neutral-600">
+                <div className="flex items-center justify-between text-ink-2">
                   <span className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-blue-500" />
                     Card / Digital In-App:
                   </span>
-                  <span className="font-black text-[#111111]">
+                  <span className="font-bold text-ink">
                     {fareService.formatZAR(digitalEarnings)}
                   </span>
                 </div>
@@ -916,14 +916,14 @@ export const DriverApp: React.FC = () => {
             </div>
 
             {/* Banking & Payout Info */}
-            <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3.5 text-xs shadow-2xs">
+            <div className="rounded-card border border-line bg-surface-2 p-3.5 text-xs ">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-[#111111]">Direct Weekly Payout</h4>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-800">
+                <h4 className="font-bold text-ink">Direct Weekly Payout</h4>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
                   Active
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-neutral-500">
+              <p className="mt-1 text-[11px] text-ink-3">
                 Standard Bank SA (•••• 4819) • Payout cycle runs every Monday at 06:00 AM SAST.
               </p>
             </div>
@@ -934,16 +934,16 @@ export const DriverApp: React.FC = () => {
         {viewTab === 'history' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-bold text-[#111111] uppercase tracking-wider">
+              <h3 className="text-[11px] font-bold text-ink uppercase tracking-wider">
                 Trip Ledger ({driverHistory.length})
               </h3>
-              <span className="text-[10px] text-neutral-400 font-medium">
+              <span className="text-[11px] text-neutral-400 font-medium">
                 Tap trip for details
               </span>
             </div>
 
             {driverHistory.length === 0 ? (
-              <div className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] py-10 text-center text-xs text-neutral-400">
+              <div className="rounded-card border border-line bg-surface-2 py-10 text-center text-xs text-neutral-400">
                 No past trips recorded in history yet.
               </div>
             ) : (
@@ -957,29 +957,29 @@ export const DriverApp: React.FC = () => {
                     <div
                       key={trip.id}
                       onClick={() => setSelectedHistoryRide(trip)}
-                      className="cursor-pointer rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3.5 space-y-1.5 shadow-2xs text-xs hover:border-[#FFC107] transition-all"
+                      className="cursor-pointer rounded-card border border-line bg-surface-2 p-3.5 space-y-1.5 text-xs hover:border-primary transition-all"
                     >
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-bold text-[#111111] truncate">{trip.passengerName || 'Passenger'}</span>
-                          <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                          <span className="font-bold text-ink truncate">{trip.passengerName || 'Passenger'}</span>
+                          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase ${
                             isCash ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
                           }`}>
                             {trip.paymentMethod || 'cash'}
                           </span>
                         </div>
-                        <span className="font-black text-emerald-600 shrink-0">
+                        <span className="font-bold text-success shrink-0">
                           +{fareService.formatZAR(takeHome)}
                         </span>
                       </div>
 
-                      <p className="text-[11px] text-neutral-500 truncate">
+                      <p className="text-[11px] text-ink-3 truncate">
                         {trip.destinationAddress}
                       </p>
 
-                      <div className="flex justify-between items-center text-[10px] text-neutral-400 pt-1 border-t border-[#E5E5E5]">
+                      <div className="flex justify-between items-center text-[11px] text-neutral-400 pt-1 border-t border-line">
                         <span>{trip.completedAt ? new Date(trip.completedAt).toLocaleDateString() : new Date(trip.createdAt).toLocaleDateString()}</span>
-                        <span className="font-bold uppercase text-neutral-700">{trip.status}</span>
+                        <span className="font-bold uppercase text-ink-2">{trip.status}</span>
                       </div>
                     </div>
                   );
@@ -991,14 +991,14 @@ export const DriverApp: React.FC = () => {
 
         {/* Selected History Ride Details Modal */}
         {selectedHistoryRide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-            <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-3.5">
-              <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-2.5">
-                <h4 className="text-sm font-black text-[#111111]">Trip Receipt Summary</h4>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-sm rounded-[20px] bg-white p-5 shadow-modal space-y-3.5">
+              <div className="flex items-center justify-between border-b border-line pb-2.5">
+                <h4 className="text-sm font-bold text-ink">Trip Receipt Summary</h4>
                 <button
                   type="button"
                   onClick={() => setSelectedHistoryRide(null)}
-                  className="rounded-full bg-neutral-100 p-1 text-neutral-500 hover:bg-neutral-200"
+                  className="rounded-full bg-surface-2 p-1 text-ink-3 hover:bg-neutral-200"
                 >
                   ✕
                 </button>
@@ -1006,42 +1006,42 @@ export const DriverApp: React.FC = () => {
 
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Passenger:</span>
-                  <span className="font-bold text-[#111111]">{selectedHistoryRide.passengerName || 'Passenger'}</span>
+                  <span className="text-ink-3">Passenger:</span>
+                  <span className="font-bold text-ink">{selectedHistoryRide.passengerName || 'Passenger'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Ride Type:</span>
-                  <span className="font-bold uppercase text-[#111111]">{selectedHistoryRide.rideType}</span>
+                  <span className="text-ink-3">Ride Type:</span>
+                  <span className="font-bold uppercase text-ink">{selectedHistoryRide.rideType}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Payment:</span>
-                  <span className="font-bold uppercase text-neutral-700">{selectedHistoryRide.paymentMethod || 'cash'} ({selectedHistoryRide.paymentStatus || 'paid'})</span>
+                  <span className="text-ink-3">Payment:</span>
+                  <span className="font-bold uppercase text-ink-2">{selectedHistoryRide.paymentMethod || 'cash'} ({selectedHistoryRide.paymentStatus || 'paid'})</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">From:</span>
-                  <span className="font-medium text-[#111111] truncate max-w-[180px]">{selectedHistoryRide.pickupAddress}</span>
+                  <span className="text-ink-3">From:</span>
+                  <span className="font-medium text-ink truncate max-w-[180px]">{selectedHistoryRide.pickupAddress}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">To:</span>
-                  <span className="font-medium text-[#111111] truncate max-w-[180px]">{selectedHistoryRide.destinationAddress}</span>
+                  <span className="text-ink-3">To:</span>
+                  <span className="font-medium text-ink truncate max-w-[180px]">{selectedHistoryRide.destinationAddress}</span>
                 </div>
 
-                <div className="border-t border-[#E5E5E5] pt-2 space-y-1">
+                <div className="border-t border-line pt-2 space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-neutral-500">Gross Fare:</span>
-                    <span className="font-bold text-[#111111]">
+                    <span className="text-ink-3">Gross Fare:</span>
+                    <span className="font-bold text-ink">
                       {fareService.formatZAR(selectedHistoryRide.finalFare || selectedHistoryRide.estimatedFare || 35.0)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-neutral-500">ZAKA Commission (15%):</span>
+                    <span className="text-ink-3">ZAKA Commission (15%):</span>
                     <span className="font-bold text-neutral-400">
                       -{fareService.formatZAR((selectedHistoryRide.finalFare || selectedHistoryRide.estimatedFare || 35.0) * 0.15)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm pt-1 border-t border-[#E5E5E5]">
-                    <span className="font-black text-[#111111]">Net Driver Payout:</span>
-                    <span className="font-black text-emerald-600">
+                  <div className="flex justify-between text-sm pt-1 border-t border-line">
+                    <span className="font-bold text-ink">Net Driver Payout:</span>
+                    <span className="font-bold text-success">
                       {fareService.formatZAR((selectedHistoryRide.finalFare || selectedHistoryRide.estimatedFare || 35.0) * 0.85)}
                     </span>
                   </div>
@@ -1051,7 +1051,7 @@ export const DriverApp: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedHistoryRide(null)}
-                className="w-full rounded-2xl bg-[#FFC107] py-2.5 text-xs font-bold text-[#111111] hover:bg-[#FFB300]"
+                className="w-full rounded-full bg-primary py-2.5 text-xs font-bold text-ink hover:bg-primary-hover active:bg-primary-pressed"
               >
                 Close Receipt
               </button>

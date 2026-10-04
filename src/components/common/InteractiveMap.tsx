@@ -120,9 +120,9 @@ const MapController: React.FC<{
         onClick={handleRecenter}
         aria-label="Re-center map"
         title="Re-center map"
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.08] bg-white/95 text-neutral-800 shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur-md hover:bg-white active:scale-95 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A00]"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink shadow-raised hover:bg-white active:scale-95 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <LocateFixed className="h-4 w-4 text-[#FF7A00] stroke-[2.4]" />
+        <LocateFixed className="h-4 w-4 text-primary-text stroke-[2.4]" />
       </button>
     </div>
   );
@@ -146,7 +146,7 @@ const VehicleMarker: React.FC<{
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M6.5 4.5C6.5 3.12 7.62 2 9 2H15C16.38 2 17.5 3.12 17.5 4.5V19.5C17.5 20.88 16.38 22 15 22H9C7.62 22 6.5 20.88 6.5 19.5V4.5Z" fill="#1E1E1E"/>
             <path d="M7.8 6.5C7.8 5.95 8.25 5.5 8.8 5.5H15.2C15.75 5.5 16.2 5.95 16.2 6.5V8.5H7.8V6.5Z" fill="#4B4B4B"/>
-            <rect x="8.5" y="9.8" width="7" height="4.5" rx="1.2" fill="#FF7A00"/>
+            <rect x="8.5" y="9.8" width="7" height="4.5" rx="1.2" fill="#ff860d"/>
             <path d="M7.8 15.5H16.2V17C16.2 17.55 15.75 18 15.2 18H8.8C8.25 18 7.8 17.55 7.8 17V15.5Z" fill="#383838"/>
             <circle cx="8.2" cy="2.8" r="0.8" fill="#FFF8DB"/>
             <circle cx="15.8" cy="2.8" r="0.8" fill="#FFF8DB"/>
@@ -355,7 +355,7 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
             {/* ZAKA clean medium-width orange route line */}
             <Polyline
               path={routeCoordinates}
-              strokeColor="#FF7A00"
+              strokeColor="#ff860d"
               strokeWeight={4}
               strokeOpacity={1}
               zIndex={21}
@@ -380,9 +380,9 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
           >
             <div className="relative flex flex-col items-center justify-end cursor-pointer group select-none">
               {/* Clean, premium white rounded "PICKUP" label attached near marker */}
-              <div className="mb-1 flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.14)] border border-black/[0.08] backdrop-blur-xs pointer-events-none transition-transform group-hover:scale-105">
-                <span className="h-2 w-2 rounded-full bg-[#FF7A00]" />
-                <span className="text-[10px] font-bold tracking-wider text-[#111111] uppercase">
+              <div className="mb-1 flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-0.5 border border-black/[0.08] backdrop-blur-xs pointer-events-none transition-transform group-hover:scale-105">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-[11px] font-bold tracking-wider text-ink uppercase">
                   PICKUP
                 </span>
               </div>
@@ -393,7 +393,7 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
                 {/* Sleek ZAKA Orange Pinpoint Pin */}
                 <div className="relative z-10 transition-transform active:scale-95 drop-shadow-[0_3px_5px_rgba(0,0,0,0.22)]">
                   <svg width="30" height="36" viewBox="0 0 30 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M15 0C6.716 0 0 6.716 0 15C0 23.3 12.9 34.6 14.39 35.88C14.75 36.19 15.25 36.19 15.61 35.88C17.1 34.6 30 23.3 30 15C30 6.716 23.284 0 15 0Z" fill="#FF7A00"/>
+                    <path d="M15 0C6.716 0 0 6.716 0 15C0 23.3 12.9 34.6 14.39 35.88C14.75 36.19 15.25 36.19 15.61 35.88C17.1 34.6 30 23.3 30 15C30 6.716 23.284 0 15 0Z" fill="#ff860d"/>
                     <circle cx="15" cy="14.5" r="5.5" fill="#FFFFFF"/>
                     <circle cx="15" cy="14.5" r="2.8" fill="#111111"/>
                   </svg>
@@ -411,9 +411,9 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
           >
             <div className="relative flex flex-col items-center justify-end cursor-pointer group select-none">
               {/* Clean, premium white rounded "DROP-OFF" label attached near marker */}
-              <div className="mb-1 flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.14)] border border-black/[0.08] backdrop-blur-xs pointer-events-none transition-transform group-hover:scale-105">
-                <span className="h-2 w-2 rounded-full bg-[#111111]" />
-                <span className="text-[10px] font-bold tracking-wider text-[#111111] uppercase">
+              <div className="mb-1 flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-0.5 border border-black/[0.08] backdrop-blur-xs pointer-events-none transition-transform group-hover:scale-105">
+                <span className="h-2 w-2 rounded-full bg-ink" />
+                <span className="text-[11px] font-bold tracking-wider text-ink uppercase">
                   DROP-OFF
                 </span>
               </div>
@@ -423,7 +423,7 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
                 <div className="relative z-10 drop-shadow-[0_3px_5px_rgba(0,0,0,0.25)]">
                   <svg width="30" height="36" viewBox="0 0 30 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15 0C6.716 0 0 6.716 0 15C0 23.3 12.9 34.6 14.39 35.88C14.75 36.19 15.25 36.19 15.61 35.88C17.1 34.6 30 23.3 30 15C30 6.716 23.284 0 15 0Z" fill="#111111"/>
-                    <circle cx="15" cy="14.5" r="5.5" fill="#FF7A00"/>
+                    <circle cx="15" cy="14.5" r="5.5" fill="#ff860d"/>
                     <rect x="12.5" y="12" width="5" height="5" rx="1" fill="#FFFFFF"/>
                   </svg>
                 </div>
@@ -436,9 +436,9 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
         {routeMidpoint && effectiveDurationMin && effectiveDurationMin > 0 && (
           <AdvancedMarker position={routeMidpoint} zIndex={850}>
             <div className="pointer-events-none select-none -translate-y-4">
-              <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 shadow-[0_2px_10px_rgba(0,0,0,0.16)] border border-black/[0.08] backdrop-blur-xs">
-                <div className="h-2 w-2 rounded-full bg-[#FF7A00]" />
-                <span className="text-[11px] font-bold text-[#111111] whitespace-nowrap tracking-tight">
+              <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 shadow-raised border border-black/[0.08] backdrop-blur-xs">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-[11px] font-bold text-ink whitespace-nowrap tracking-tight">
                   {effectiveDurationMin} min
                 </span>
               </div>
@@ -470,10 +470,10 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
 export const InteractiveMap: React.FC<InteractiveMapProps> = (props) => {
   if (!GOOGLE_MAPS_API_KEY) {
     return (
-      <div className={`relative h-full w-full flex items-center justify-center bg-[#F5F5F3] p-4 text-center ${props.className || ''}`}>
-        <div className="max-w-xs p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
-          <p className="text-sm font-semibold text-neutral-800">Google Maps API Key Missing</p>
-          <p className="text-xs text-neutral-500 mt-1">Please set VITE_GOOGLE_MAPS_API_KEY to display the live Google Map.</p>
+      <div className={`relative h-full w-full flex items-center justify-center bg-surface-2 p-4 text-center ${props.className || ''}`}>
+        <div className="max-w-xs p-4 bg-white rounded-card border border-line">
+          <p className="text-sm font-semibold text-ink">Google Maps API Key Missing</p>
+          <p className="text-xs text-ink-3 mt-1">Please set VITE_GOOGLE_MAPS_API_KEY to display the live Google Map.</p>
         </div>
       </div>
     );

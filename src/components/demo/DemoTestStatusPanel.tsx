@@ -80,38 +80,38 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'searching':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">SEARCHING</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">SEARCHING</span>;
       case 'accepted':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300">ACCEPTED</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-900 border border-blue-300">ACCEPTED</span>;
       case 'driver_arriving':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-900 border border-indigo-300">DRIVER ARRIVING</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-300">DRIVER ARRIVING</span>;
       case 'driver_arrived':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300">DRIVER ARRIVED</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-300">DRIVER ARRIVED</span>;
       case 'in_progress':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-yellow-100 text-yellow-900 border border-yellow-400">IN PROGRESS</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-yellow-100 text-yellow-900 border border-yellow-400">IN PROGRESS</span>;
       case 'completed':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">COMPLETED</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">COMPLETED</span>;
       case 'cancelled':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-neutral-200 text-neutral-800">CANCELLED</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-ink">CANCELLED</span>;
       default:
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600">IDLE / READY</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-surface-2 text-ink-2">IDLE / READY</span>;
     }
   };
 
   return (
     <div
       id="demo-test-status-panel"
-      className="w-full border-b border-neutral-300 bg-neutral-900 text-white shadow-xl px-3 py-3 sm:px-6 sm:py-4 transition-all"
+      className="w-full border-b border-neutral-300 bg-ink text-white shadow-raised px-3 py-3 sm:px-6 sm:py-4 transition-all"
     >
       <div className="mx-auto max-w-7xl">
         {/* Header row */}
         <div className="flex items-center justify-between pb-2.5 border-b border-neutral-800">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex h-2 w-2 rounded-full bg-[#FFC107] animate-ping" />
-            <h3 className="text-xs sm:text-sm font-black tracking-wide uppercase text-[#FFC107] truncate">
+            <span className="flex h-2 w-2 rounded-full bg-primary animate-ping" />
+            <h3 className="text-xs sm:text-sm font-bold tracking-wide uppercase text-primary truncate">
               Demo Test Ride • Live Telemetry
             </h3>
-            <span className="text-[10px] font-mono text-neutral-400 hidden sm:inline">
+            <span className="text-[11px] font-mono text-neutral-400 hidden sm:inline">
               (Direct Cloud Firestore Stream)
             </span>
           </div>
@@ -119,7 +119,7 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+              className="p-1 rounded-full text-neutral-400 hover:text-white hover:bg-ink transition-colors"
               aria-label="Close status panel"
             >
               <X className="h-4 w-4" />
@@ -131,7 +131,7 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-3">
           {/* Rider */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-neutral-700/60">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
               <User className="h-3 w-3 text-amber-400" />
               <span>Rider</span>
             </div>
@@ -142,7 +142,7 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
 
           {/* Driver */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-neutral-700/60">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
               <Car className="h-3 w-3 text-emerald-400" />
               <span>Driver</span>
             </div>
@@ -153,18 +153,18 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
 
           {/* Ride ID */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-neutral-700/60 col-span-2 sm:col-span-2">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-              <ExternalLink className="h-3 w-3 text-[#FFC107]" />
+            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+              <ExternalLink className="h-3 w-3 text-primary" />
               <span>Firestore Ride ID</span>
             </div>
-            <p className="mt-1 text-xs font-mono text-[#FFC107] truncate select-all" title={activeRide?.id || 'None'}>
+            <p className="mt-1 text-xs font-mono text-primary truncate select-all" title={activeRide?.id || 'None'}>
               {activeRide?.id ? activeRide.id : 'No active test ride'}
             </p>
           </div>
 
           {/* Current Status */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-neutral-700/60">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
               <Clock className="h-3 w-3 text-blue-400" />
               <span>Status</span>
             </div>
@@ -175,29 +175,29 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
 
           {/* Fare */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-neutral-700/60">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
               <DollarSign className="h-3 w-3 text-emerald-400" />
               <span>Fare</span>
             </div>
-            <p className="mt-1 text-xs sm:text-sm font-black text-white">
+            <p className="mt-1 text-xs sm:text-sm font-bold text-white">
               {fareAmount ? `R${fareAmount.toFixed(2)}` : '—'}
             </p>
           </div>
 
           {/* Safety PIN */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-amber-500/40 bg-amber-950/20">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
-              <Key className="h-3 w-3 text-[#FFC107]" />
+            <div className="flex items-center gap-1 text-[11px] font-bold text-amber-300 uppercase tracking-wider">
+              <Key className="h-3 w-3 text-primary" />
               <span>Safety PIN</span>
             </div>
-            <p className="mt-1 text-sm font-mono font-black text-[#FFC107] tracking-wider">
+            <p className="mt-1 text-sm font-mono font-bold text-primary tracking-wider">
               {activeRide?.otp || '—'}
             </p>
           </div>
 
           {/* Payment Status */}
           <div className="rounded-xl bg-neutral-800/80 p-2 border border-neutral-700/60">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
               <CreditCard className="h-3 w-3 text-purple-400" />
               <span>Payment</span>
             </div>
@@ -224,7 +224,7 @@ export const DemoTestStatusPanel: React.FC<DemoTestStatusPanelProps> = ({
               </span>
             </div>
           </div>
-          <div className="text-[10px] text-neutral-500 font-mono mt-1 sm:mt-0">
+          <div className="text-[11px] text-ink-3 font-mono mt-1 sm:mt-0">
             Data Source: /rides/{activeRide?.id || '...'} • isDemo: true
           </div>
         </div>

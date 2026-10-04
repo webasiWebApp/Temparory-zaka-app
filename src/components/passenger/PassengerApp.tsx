@@ -380,7 +380,7 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
           id="ride-request-error"
           role="alert"
           onClick={() => setRequestError(null)}
-          className="fixed left-4 right-4 top-20 z-[60] mx-auto max-w-md cursor-pointer rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs font-bold text-red-700 shadow-lg"
+          className="fixed left-4 right-4 top-20 z-[60] mx-auto max-w-md cursor-pointer rounded-card border border-red-200 bg-red-50 p-3.5 text-xs font-bold text-danger shadow-raised"
         >
           {requestError}
         </div>
@@ -430,7 +430,7 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
   return (
     <div
       id="passenger-main-container"
-      className="relative flex flex-1 w-full flex-col min-h-0 bg-[#F7F7F5] lg:flex-row lg:h-[calc(100dvh-61px)] lg:overflow-hidden"
+      className="relative flex flex-1 w-full flex-col min-h-0 bg-white lg:flex-row lg:h-[calc(100dvh-61px)] lg:overflow-hidden"
     >
       {/* MAP VIEW CONTAINER */}
       <div className="relative h-[38vh] min-h-[220px] max-h-[360px] w-full shrink-0 lg:h-full lg:flex-1 lg:max-h-none min-h-0">
@@ -452,7 +452,7 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
       </div>
 
       {/* BOTTOM FLOATING PANEL */}
-      <div className="z-20 flex flex-1 flex-col overflow-y-auto rounded-t-[36px] border-t border-neutral-100 bg-white p-4 shadow-[0_-12px_40px_rgba(0,0,0,0.06)] sm:p-6 lg:h-full lg:max-w-md lg:rounded-none lg:border-t-0 lg:border-l pb-28 sm:pb-32">
+      <div className="z-20 flex flex-1 flex-col overflow-y-auto rounded-t-sheet border-t border-line bg-white p-4 shadow-card sm:p-6 lg:h-full lg:max-w-md lg:rounded-none lg:border-t-0 lg:border-l pb-28 sm:pb-32">
         {activeRide && activeRide.status !== 'completed' ? (
           <ActiveRidePanel
             ride={activeRide}

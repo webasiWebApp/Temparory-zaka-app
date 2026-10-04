@@ -224,36 +224,36 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
   return (
     <div id="passenger-completed-ride-screen" className="w-full max-w-lg mx-auto space-y-4 text-center">
       {/* Success Badge */}
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-[0_6px_20px_rgba(16,185,129,0.15)] ring-8 ring-emerald-50/50">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-success ring-8 ring-emerald-50/50">
         <Check className="h-8 w-8 stroke-[3]" />
       </div>
 
       <div>
-        <span className="inline-block rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-800 uppercase tracking-wide mb-1.5">
+        <span className="inline-block rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-800 uppercase tracking-wide mb-1.5">
           Trip Completed
         </span>
-        <h3 className="text-2xl font-black text-neutral-900 tracking-tight">You Have Arrived!</h3>
-        <p className="text-xs text-neutral-500 max-w-xs mx-auto mt-1 font-medium">
+        <h3 className="text-2xl font-bold text-ink tracking-tight">You Have Arrived!</h3>
+        <p className="text-xs text-ink-3 max-w-xs mx-auto mt-1 font-medium">
           Thank you for riding with ZAKA. Your receipt is summarized below.
         </p>
       </div>
 
       {/* Driver Summary Card */}
-      <div className="rounded-[28px] bg-white border border-neutral-100/90 p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+      <div className="rounded-card bg-white border border-neutral-100/90 p-4 text-left shadow-card">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FFF5EB] text-[#FF7A00] font-black text-base shrink-0 shadow-xs border border-[#FF7A00]/20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-text font-bold text-base shrink-0 border border-primary/20">
               {ride.driverName ? ride.driverName.charAt(0) : 'D'}
             </div>
             <div className="min-w-0">
-              <h4 className="text-sm font-black text-neutral-900 truncate">{ride.driverName || 'Your driver'}</h4>
-              <p className="text-[11px] text-neutral-500 truncate font-semibold">
+              <h4 className="text-sm font-bold text-ink truncate">{ride.driverName || 'Your driver'}</h4>
+              <p className="text-[11px] text-ink-3 truncate font-semibold">
                 {[ride.vehicleDetails?.colour, ride.vehicleDetails?.make, ride.vehicleDetails?.model].filter(Boolean).join(' ') || 'Vehicle'}
               </p>
             </div>
           </div>
           <div className="text-right shrink-0">
-            <span className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-1 font-mono text-xs font-black text-neutral-900">
+            <span className="rounded-card border border-line bg-surface-2 px-3 py-1 font-mono text-xs font-bold text-ink">
               {ride.vehicleDetails?.registrationNumber || '—'}
             </span>
           </div>
@@ -261,71 +261,71 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
       </div>
 
       {/* Route & Timings Card */}
-      <div className="rounded-[28px] bg-white border border-neutral-100/90 p-4 text-left text-xs space-y-3 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+      <div className="rounded-card bg-white border border-neutral-100/90 p-4 text-left text-xs space-y-3 shadow-card">
         <div className="flex items-start gap-3">
-          <div className="mt-1 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100 shrink-0" />
+          <div className="mt-1 h-3 w-3 rounded-full bg-success ring-4 ring-emerald-100 shrink-0" />
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">Pickup Location</span>
-            <p className="font-bold text-neutral-900 text-xs sm:text-sm truncate">{ride.pickupAddress}</p>
+            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wide">Pickup Location</span>
+            <p className="font-bold text-ink text-xs sm:text-sm truncate">{ride.pickupAddress}</p>
           </div>
         </div>
         <div className="flex items-start gap-3">
-          <div className="mt-1 h-3 w-3 rounded-full bg-[#FF7A00] ring-4 ring-[#FFF5EB] shrink-0" />
+          <div className="mt-1 h-3 w-3 rounded-full bg-primary ring-4 ring-primary-50 shrink-0" />
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">Destination</span>
-            <p className="font-bold text-neutral-900 text-xs sm:text-sm truncate">{ride.destinationAddress}</p>
+            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wide">Destination</span>
+            <p className="font-bold text-ink text-xs sm:text-sm truncate">{ride.destinationAddress}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 border-t border-neutral-100 pt-3 text-center text-[11px]">
+        <div className="grid grid-cols-3 gap-2 border-t border-line pt-3 text-center text-[11px]">
           <div>
-            <span className="text-neutral-400 block text-[10px] font-semibold">Distance</span>
-            <span className="font-black text-neutral-900">{ride.estimatedDistanceKm ?? '—'} km</span>
+            <span className="text-neutral-400 block text-[11px] font-semibold">Distance</span>
+            <span className="font-bold text-ink">{ride.estimatedDistanceKm ?? '—'} km</span>
           </div>
           <div>
-            <span className="text-neutral-400 block text-[10px] font-semibold">Duration</span>
-            <span className="font-black text-neutral-900">{ride.estimatedDurationMin ?? '—'} min</span>
+            <span className="text-neutral-400 block text-[11px] font-semibold">Duration</span>
+            <span className="font-bold text-ink">{ride.estimatedDurationMin ?? '—'} min</span>
           </div>
           <div>
-            <span className="text-neutral-400 block text-[10px] font-semibold">Completed</span>
-            <span className="font-black text-neutral-900">{formattedCompletedTime}</span>
+            <span className="text-neutral-400 block text-[11px] font-semibold">Completed</span>
+            <span className="font-bold text-ink">{formattedCompletedTime}</span>
           </div>
         </div>
       </div>
 
       {/* Payment Receipt Card with Status */}
-      <div className="rounded-[28px] bg-white border border-neutral-100/90 p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] space-y-3">
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5 text-xs">
+      <div className="rounded-card bg-white border border-neutral-100/90 p-4 text-left shadow-card space-y-3">
+        <div className="flex items-center justify-between border-b border-line pb-2.5 text-xs">
           <div className="flex items-center gap-2">
             {isCash ? (
-              <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
+              <Banknote className="h-4 w-4 text-success shrink-0" />
             ) : paymentMethod === 'card' || paymentMethod === 'digital' ? (
               <CreditCard className="h-4 w-4 text-blue-600 shrink-0" />
             ) : (
-              <Wallet className="h-4 w-4 text-[#FF7A00] shrink-0" />
+              <Wallet className="h-4 w-4 text-primary-text shrink-0" />
             )}
-            <span className="text-neutral-600 font-bold uppercase tracking-wide text-[11px]">
+            <span className="text-ink-2 font-bold uppercase tracking-wide text-[11px]">
               {isCash ? 'Cash Payment' : isWallet ? 'ZAKA Wallet' : 'Card Payment'}
             </span>
           </div>
-          <span className="font-black text-neutral-900 text-lg">
+          <span className="font-bold text-ink text-lg">
             {fareService.formatZAR(finalFare)}
           </span>
         </div>
 
         {/* Live Payment Status Banner & Gateway Actions */}
         {isCash ? (
-          <div className={`rounded-2xl p-3 text-xs flex items-center gap-2.5 ${
+          <div className={`rounded-card p-3 text-xs flex items-center gap-2.5 ${
             isPaid
               ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
               : 'bg-amber-50 text-amber-900 border border-amber-200'
           }`}>
             {isPaid ? (
               <>
-                <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="h-4.5 w-4.5 text-success shrink-0" />
                 <div>
                   <span className="font-bold block">Cash Payment Confirmed ✓</span>
-                  <span className="text-[11px] text-emerald-700">
+                  <span className="text-[11px] text-success">
                     Your driver has verified receipt of {fareService.formatZAR(finalFare)} in cash.
                   </span>
                 </div>
@@ -344,14 +344,14 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
           </div>
         ) : isWallet ? (
           <div className="space-y-2">
-            <div className={`rounded-2xl p-3 text-xs flex items-center justify-between gap-2 ${
+            <div className={`rounded-card p-3 text-xs flex items-center justify-between gap-2 ${
               isPaid
                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                 : 'bg-amber-50 text-amber-900 border border-amber-200'
             }`}>
               <div className="flex items-center gap-2.5">
                 {isPaid ? (
-                  <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="h-4.5 w-4.5 text-success shrink-0" />
                 ) : (
                   <Wallet className="h-4.5 w-4.5 text-amber-600 shrink-0" />
                 )}
@@ -359,7 +359,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                   <span className="font-bold block">
                     {isPaid ? 'Paid from ZAKA Wallet ✓' : walletShort ? 'Wallet balance too low' : 'Wallet payment processing'}
                   </span>
-                  <span className="text-[11px] text-neutral-600">
+                  <span className="text-[11px] text-ink-2">
                     {isPaid
                       ? `${fareService.formatZAR(finalFare)} was deducted from your wallet.`
                       : walletShort
@@ -373,7 +373,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                   type="button"
                   onClick={handleRetryWalletPayment}
                   disabled={isProcessingPayment}
-                  className="shrink-0 rounded-full bg-neutral-900 px-3 py-1.5 text-xs font-black text-white hover:bg-neutral-800 active:scale-95 transition-all"
+                  className="shrink-0 rounded-full bg-ink px-3 py-1.5 text-xs font-bold text-white hover:bg-ink active:scale-95 transition-all"
                 >
                   {isProcessingPayment ? 'Checking…' : 'Retry'}
                 </button>
@@ -381,7 +381,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
             </div>
 
             {paymentNotice && (
-              <p className="text-center text-xs font-bold text-neutral-700">{paymentNotice}</p>
+              <p className="text-center text-xs font-bold text-ink-2">{paymentNotice}</p>
             )}
 
             {!isPaid && (
@@ -389,7 +389,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                 <button
                   type="button"
                   onClick={handleSwitchToCash}
-                  className="text-xs font-bold text-neutral-500 hover:text-neutral-900 underline underline-offset-2"
+                  className="text-xs font-bold text-ink-3 hover:text-ink underline underline-offset-2"
                 >
                   Pay your driver in cash instead
                 </button>
@@ -398,14 +398,14 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
           </div>
         ) : (
           <div className="space-y-2">
-            <div className={`rounded-2xl p-3 text-xs flex items-center justify-between ${
+            <div className={`rounded-card p-3 text-xs flex items-center justify-between ${
               isPaid
                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                 : 'bg-blue-50 text-blue-900 border border-blue-200'
             }`}>
               <div className="flex items-center gap-2.5">
                 {isPaid ? (
-                  <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="h-4.5 w-4.5 text-success shrink-0" />
                 ) : (
                   <CreditCard className="h-4.5 w-4.5 text-blue-600 shrink-0" />
                 )}
@@ -413,7 +413,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                   <span className="font-bold block">
                     {isPaid ? 'Payment Settled Successfully' : 'Digital Payment Pending'}
                   </span>
-                  <span className="text-[11px] text-neutral-600">
+                  <span className="text-[11px] text-ink-2">
                     {isPaid ? 'Peach Payments transaction confirmed' : '3D-Secure card authorization'}
                   </span>
                 </div>
@@ -424,7 +424,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                   type="button"
                   onClick={handleInitiateCardPayment}
                   disabled={isProcessingPayment}
-                  className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-black text-white hover:bg-blue-700 active:scale-95 transition-all shadow-xs"
+                  className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 active:scale-95 transition-all shadow-card"
                 >
                   {isProcessingPayment ? 'Connecting...' : 'Pay Now'}
                 </button>
@@ -432,7 +432,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
             </div>
 
             {paymentNotice && (
-              <p className="text-center text-xs font-bold text-neutral-700">{paymentNotice}</p>
+              <p className="text-center text-xs font-bold text-ink-2">{paymentNotice}</p>
             )}
 
             {!isPaid && (
@@ -440,7 +440,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                 <button
                   type="button"
                   onClick={handleSwitchToCash}
-                  className="text-xs font-bold text-neutral-500 hover:text-neutral-900 underline underline-offset-2"
+                  className="text-xs font-bold text-ink-3 hover:text-ink underline underline-offset-2"
                 >
                   Prefer to pay cash? Switch to Cash Payment
                 </button>
@@ -449,18 +449,18 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
           </div>
         )}
 
-        <div className="space-y-1.5 text-[11px] text-neutral-500 pt-1">
+        <div className="space-y-1.5 text-[11px] text-ink-3 pt-1">
           <div className="flex justify-between">
             <span>Ride Fare ({ride.rideType.toUpperCase()})</span>
-            <span className="font-semibold text-neutral-700">{fareService.formatZAR(finalFare)}</span>
+            <span className="font-semibold text-ink-2">{fareService.formatZAR(finalFare)}</span>
           </div>
           {tipVal > 0 && (
-            <div className="flex justify-between text-emerald-600 font-semibold">
+            <div className="flex justify-between text-success font-semibold">
               <span>Driver Tip (given in cash)</span>
               <span>+{fareService.formatZAR(tipVal)}</span>
             </div>
           )}
-          <div className="flex justify-between text-[10px] text-neutral-400 pt-1.5 border-t border-neutral-100">
+          <div className="flex justify-between text-[11px] text-neutral-400 pt-1.5 border-t border-line">
             <span>Requested at {formattedRequestedTime}</span>
             <span>Ref: {ride.id.slice(0, 8).toUpperCase()}</span>
           </div>
@@ -468,8 +468,8 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
       </div>
 
       {/* Rate Driver Section */}
-      <div className="rounded-[28px] bg-white border border-neutral-100/90 p-4 space-y-3.5 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-        <p className="text-sm font-black text-neutral-900 text-center">
+      <div className="rounded-card bg-white border border-neutral-100/90 p-4 space-y-3.5 text-left shadow-card">
+        <p className="text-sm font-bold text-ink text-center">
           How was your ride with {ride.driverName || 'your driver'}?
         </p>
 
@@ -486,7 +486,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
               <Star
                 className={`h-8 w-8 ${
                   star <= ratingVal
-                    ? 'fill-[#FF7A00] text-[#FF7A00]'
+                    ? 'fill-primary text-primary-text'
                     : 'text-neutral-200'
                 }`}
               />
@@ -495,8 +495,8 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
         </div>
 
         {/* Compliment Tags */}
-        <div className="space-y-2 pt-1 border-t border-neutral-100">
-          <span className="block text-center text-xs font-bold text-neutral-500">Add Compliments</span>
+        <div className="space-y-2 pt-1 border-t border-line">
+          <span className="block text-center text-xs font-bold text-ink-3">Add Compliments</span>
           <div className="flex flex-wrap justify-center gap-1.5">
             {PASSENGER_COMPLIMENT_TAGS.map((tag) => {
               const isSelected = selectedTags.includes(tag);
@@ -507,8 +507,8 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                   onClick={() => toggleTag(tag)}
                   className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all ${
                     isSelected
-                      ? 'bg-[#FFF5EB] text-[#FF7A00] ring-1 ring-[#FF7A00]/40'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      ? 'bg-primary-50 text-primary-text ring-1 ring-primary/40'
+                      : 'bg-surface-2 text-ink-2 hover:bg-neutral-200'
                   }`}
                 >
                   {isSelected ? `✓ ${tag}` : `+ ${tag}`}
@@ -519,8 +519,8 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
         </div>
 
         {/* Tip Selection */}
-        <div className="space-y-2 pt-1 border-t border-neutral-100">
-          <span className="block text-center text-xs font-bold text-neutral-500">Add a Driver Tip</span>
+        <div className="space-y-2 pt-1 border-t border-line">
+          <span className="block text-center text-xs font-bold text-ink-3">Add a Driver Tip</span>
           <div className="flex justify-center gap-2">
             {[0, 10, 20, 50].map((tip) => (
               <button
@@ -529,8 +529,8 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                 onClick={() => setTipVal(tip)}
                 className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
                   tipVal === tip
-                    ? 'bg-neutral-900 text-white shadow-xs'
-                    : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
+                    ? 'bg-ink text-white shadow-card'
+                    : 'border border-line bg-white text-ink-2 hover:bg-surface-2'
                 }`}
               >
                 {tip === 0 ? 'No Tip' : `R${tip}`}
@@ -545,7 +545,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
           onChange={(e) => setRatingComment(e.target.value)}
           placeholder="Leave an additional note (optional)..."
           rows={2}
-          className="w-full rounded-2xl border border-neutral-200 p-3 text-xs focus:border-[#FF7A00] focus:outline-none"
+          className="w-full rounded-input border border-line p-3 text-xs focus:border-primary focus:outline-none"
         />
       </div>
 
@@ -554,7 +554,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
         id="btn-done-completed-ride"
         onClick={handleSubmitRatingAndClose}
         disabled={isSubmitting || submitted}
-        className="w-full rounded-full bg-[#FF7A00] py-4 text-sm font-black text-white shadow-[0_8px_20px_rgba(255,122,0,0.25)] hover:bg-[#E66E00] active:scale-[0.98] transition-all disabled:opacity-50"
+        className="w-full rounded-full bg-primary py-4 text-sm font-bold text-on-primary hover:bg-primary-hover active:bg-primary-pressed active:scale-[0.98] transition-all disabled:opacity-50"
       >
         {isSubmitting ? 'Submitting Feedback...' : submitted ? 'Thank You! Completed ✓' : 'Submit & Finish'}
       </button>

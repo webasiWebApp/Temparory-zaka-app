@@ -374,21 +374,21 @@ export const AdminDashboard: React.FC = () => {
   if (!isAdmin) {
     const returnRole = userProfile?.role === 'driver' ? 'driver' : 'passenger';
     return (
-      <div className="flex min-h-[calc(100vh-61px)] flex-col items-center justify-center bg-[#F4F5F7] p-6 text-center">
-        <div className="w-full max-w-md space-y-4 rounded-3xl border border-[#E5E5E5] bg-white p-8 shadow-xl">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+      <div className="flex min-h-[calc(100vh-61px)] flex-col items-center justify-center bg-surface-2 p-6 text-center">
+        <div className="w-full max-w-md space-y-4 rounded-card border border-line bg-white p-8 shadow-raised">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-card bg-red-100 text-danger">
             <ShieldAlert className="h-8 w-8" />
           </div>
           <div>
-            <h2 className="text-xl font-black text-[#111111]">Administrator Access Restricted</h2>
-            <p className="mt-2 text-xs text-neutral-600 leading-relaxed">
+            <h2 className="text-xl font-bold text-ink">Administrator Access Restricted</h2>
+            <p className="mt-2 text-xs text-ink-2 leading-relaxed">
               Your account does not have verified fleet operations administrator permissions.
               Access to user directories, driver verification credentials, and pricing controls is restricted.
             </p>
           </div>
           <button
             onClick={() => setActiveRole(returnRole)}
-            className="w-full rounded-2xl bg-[#111111] py-3 text-xs font-bold text-white shadow-md hover:bg-neutral-800 transition-all active:scale-[0.99]"
+            className="w-full rounded-full bg-ink py-3 text-xs font-bold text-white shadow-card hover:bg-ink transition-all active:scale-[0.99]"
           >
             Return to {returnRole === 'driver' ? 'Driver App' : 'Passenger App'}
           </button>
@@ -398,14 +398,14 @@ export const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-61px)] bg-[#F4F5F7]">
+    <div className="flex min-h-[calc(100vh-61px)] bg-surface-2">
       {/* LEFT SIDEBAR NAVIGATION */}
-      <aside className="hidden w-64 flex-col border-r border-[#E5E5E5] bg-white p-4 md:flex">
+      <aside className="hidden w-64 flex-col border-r border-line bg-white p-4 md:flex">
         <div className="mb-4 px-3 py-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-neutral-400">
             ZAKA OPERATIONS
           </span>
-          <h2 className="text-sm font-black text-[#111111]">Fleet Control Hub</h2>
+          <h2 className="text-sm font-bold text-ink">Fleet Control Hub</h2>
         </div>
 
         <nav className="space-y-1">
@@ -426,10 +426,10 @@ export const AdminDashboard: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
+                className={`flex w-full items-center gap-3 rounded-full px-3.5 py-2.5 text-xs font-bold transition-all ${
                   isSel
-                    ? 'bg-[#111111] text-[#FFC107] shadow-sm'
-                    : 'text-neutral-600 hover:bg-[#F5F5F5] hover:text-[#111111]'
+                    ? 'bg-ink text-white shadow-card'
+                    : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -439,11 +439,11 @@ export const AdminDashboard: React.FC = () => {
           })}
         </nav>
 
-        <div className="mt-auto border-t border-[#E5E5E5] pt-4 space-y-2">
+        <div className="mt-auto border-t border-line pt-4 space-y-2">
           <button
             onClick={loadAdminData}
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E5E5E5] bg-[#F9FAFB] py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-100"
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface-2 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Sync Live Data</span>
@@ -452,7 +452,7 @@ export const AdminDashboard: React.FC = () => {
           <button
             onClick={() => signOut()}
             disabled={isSigningOut}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50/70 py-2 text-xs font-bold text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50/70 py-2 text-xs font-bold text-danger hover:bg-red-100 transition-colors disabled:opacity-50"
           >
             <LogOut className="h-3.5 w-3.5" />
             <span>{isSigningOut ? 'Signing Out...' : 'Sign Out Admin'}</span>
@@ -463,7 +463,7 @@ export const AdminDashboard: React.FC = () => {
       {/* MAIN ADMIN WORKSPACE */}
       <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 max-w-full">
         {/* MOBILE HORIZONTAL TAB SWITCHER */}
-        <div className="mb-4 flex overflow-x-auto pb-1 gap-1.5 md:hidden border-b border-[#E5E5E5] scrollbar-none">
+        <div className="mb-4 flex overflow-x-auto pb-1 gap-1.5 md:hidden border-b border-line scrollbar-none">
           {[
             { id: 'dashboard', label: 'Overview', icon: TrendingUp },
             { id: 'passengers', label: 'Riders', icon: Users },
@@ -481,10 +481,10 @@ export const AdminDashboard: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                   isSel
-                    ? 'bg-[#111111] text-[#FFC107] shadow-xs'
-                    : 'bg-white border border-[#E5E5E5] text-neutral-600'
+                    ? 'bg-ink text-white shadow-card'
+                    : 'bg-white border border-line text-ink-2'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -496,43 +496,43 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TOP STATS BENTO GRID */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
-          <div className="rounded-2xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase text-neutral-400">Total Rides</span>
+          <div className="rounded-card border border-line bg-white p-4 ">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Total Rides</span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-[#111111]">{rides.length}</span>
-              <span className="text-xs font-bold text-emerald-600">
+              <span className="text-2xl font-bold text-ink">{rides.length}</span>
+              <span className="text-xs font-bold text-success">
                 {completedRides} Completed
               </span>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase text-neutral-400">Platform GMV</span>
+          <div className="rounded-card border border-line bg-white p-4 ">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Platform GMV</span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-[#111111]">
+              <span className="text-2xl font-bold text-ink">
                 {fareService.formatZAR(totalGmv)}
               </span>
-              <span className="text-xs font-bold text-[#FFC107]">
+              <span className="text-xs font-bold text-primary-text">
                 {fareService.formatZAR(platformRevenue)} Net
               </span>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase text-neutral-400">Active Drivers</span>
+          <div className="rounded-card border border-line bg-white p-4 ">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Active Drivers</span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-[#111111]">{activeOnlineDrivers}</span>
-              <span className="text-xs font-bold text-neutral-500">
+              <span className="text-2xl font-bold text-ink">{activeOnlineDrivers}</span>
+              <span className="text-xs font-bold text-ink-3">
                 / {totalDriversCount} Total
               </span>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase text-neutral-400">Passengers</span>
+          <div className="rounded-card border border-line bg-white p-4 ">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Passengers</span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-[#111111]">{totalPassengers}</span>
-              <span className="text-xs font-bold text-neutral-500">Active Base</span>
+              <span className="text-2xl font-bold text-ink">{totalPassengers}</span>
+              <span className="text-xs font-bold text-ink-3">Active Base</span>
             </div>
           </div>
         </div>
@@ -543,14 +543,14 @@ export const AdminDashboard: React.FC = () => {
             {/* Live Map & Operations Feed */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               {/* Map View */}
-              <div className="lg:col-span-8 overflow-hidden rounded-3xl border border-[#E5E5E5] bg-white shadow-sm">
-                <div className="border-b border-[#E5E5E5] p-4 flex justify-between items-center">
+              <div className="lg:col-span-8 overflow-hidden rounded-card border border-line bg-white ">
+                <div className="border-b border-line p-4 flex justify-between items-center">
                   <div>
-                    <h3 className="text-sm font-black text-[#111111]">Live Fleet Radar Feed</h3>
-                    <p className="text-[11px] text-neutral-500">Real-time driver positions & active trips</p>
+                    <h3 className="text-sm font-bold text-ink">Live Fleet Radar Feed</h3>
+                    <p className="text-[11px] text-ink-3">Real-time driver positions & active trips</p>
                   </div>
                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="h-2 w-2 rounded-full bg-success animate-ping" />
                     {activeOnlineDrivers} Drivers Online
                   </span>
                 </div>
@@ -573,9 +573,9 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* In-Flight & Recent Dispatches */}
-              <div className="lg:col-span-4 rounded-3xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center justify-between border-b border-[#E5E5E5] pb-3">
-                  <h3 className="text-sm font-black text-[#111111]">Recent Activity</h3>
+              <div className="lg:col-span-4 rounded-card border border-line bg-white p-4 ">
+                <div className="mb-3 flex items-center justify-between border-b border-line pb-3">
+                  <h3 className="text-sm font-bold text-ink">Recent Activity</h3>
                   <span className="text-[11px] font-bold text-neutral-400">FIRESTORE FEED</span>
                 </div>
 
@@ -583,16 +583,16 @@ export const AdminDashboard: React.FC = () => {
                   {rides.slice(0, 5).map((ride) => (
                     <div
                       key={ride.id}
-                      className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3 text-xs space-y-1"
+                      className="rounded-card border border-line bg-surface-2 p-3 text-xs space-y-1"
                     >
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-[#111111]">{ride.passengerName}</span>
-                        <span className="font-mono font-black text-[#111111]">
+                        <span className="font-bold text-ink">{ride.passengerName}</span>
+                        <span className="font-mono font-bold text-ink">
                           {fareService.formatZAR(ride.estimatedFare)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-neutral-500 truncate">{ride.destinationAddress}</p>
-                      <div className="flex justify-between items-center pt-1 text-[10px] text-neutral-400">
+                      <p className="text-[11px] text-ink-3 truncate">{ride.destinationAddress}</p>
+                      <div className="flex justify-between items-center pt-1 text-[11px] text-neutral-400">
                         <span>{ride.rideType.toUpperCase()}</span>
                         <span
                           className={`rounded px-1.5 py-0.5 font-bold uppercase ${
@@ -600,7 +600,7 @@ export const AdminDashboard: React.FC = () => {
                               ? 'bg-emerald-100 text-emerald-800'
                               : ride.status === 'in_progress'
                               ? 'bg-amber-100 text-amber-800'
-                              : 'bg-neutral-200 text-neutral-700'
+                              : 'bg-neutral-200 text-ink-2'
                           }`}
                         >
                           {ride.status}
@@ -616,11 +616,11 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 2: PASSENGERS */}
         {activeTab === 'passengers' && (
-          <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
+          <div className="rounded-card border border-line bg-white p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
-                <h3 className="text-base font-black text-[#111111]">Registered Passengers</h3>
-                <p className="text-xs text-neutral-500">Live profiles stored in Firestore</p>
+                <h3 className="text-base font-bold text-ink">Registered Passengers</h3>
+                <p className="text-xs text-ink-3">Live profiles stored in Firestore</p>
               </div>
               <span className="text-xs font-bold text-neutral-400">
                 {users.filter((u) => u.role === 'passenger').length} Users
@@ -630,7 +630,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#E5E5E5] text-neutral-400 font-bold uppercase text-[10px]">
+                  <tr className="border-b border-line text-neutral-400 font-bold uppercase text-[11px]">
                     <th className="pb-2">Passenger</th>
                     <th className="pb-2">Phone</th>
                     <th className="pb-2">Email</th>
@@ -638,16 +638,16 @@ export const AdminDashboard: React.FC = () => {
                     <th className="pb-2">Joined Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E5E5E5]">
+                <tbody className="divide-y divide-line">
                   {users
                     .filter((u) => u.role === 'passenger')
                     .map((p) => (
-                      <tr key={p.uid} className="hover:bg-[#F9FAFB]">
-                        <td className="py-3 font-bold text-[#111111]">{p.name}</td>
-                        <td className="py-3 text-neutral-600">{p.phone}</td>
-                        <td className="py-3 text-neutral-500">{p.email}</td>
+                      <tr key={p.uid} className="hover:bg-surface-2">
+                        <td className="py-3 font-bold text-ink">{p.name}</td>
+                        <td className="py-3 text-ink-2">{p.phone}</td>
+                        <td className="py-3 text-ink-3">{p.email}</td>
                         <td className="py-3">
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 uppercase">
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 uppercase">
                             {p.status}
                           </span>
                         </td>
@@ -665,11 +665,11 @@ export const AdminDashboard: React.FC = () => {
         {/* TAB 3: DRIVERS & VERIFICATION QUEUE */}
         {activeTab === 'drivers' && (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#E5E5E5] pb-4 gap-3">
+            <div className="rounded-card border border-line bg-white p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-line pb-4 gap-3">
                 <div>
-                  <h3 className="text-base font-black text-[#111111]">Driver Compliance & Verification Console</h3>
-                  <p className="text-xs text-neutral-500">
+                  <h3 className="text-base font-bold text-ink">Driver Compliance & Verification Console</h3>
+                  <p className="text-xs text-ink-3">
                     Audit compliance documentation, authorize driver roadworthiness, and inspect credentials
                   </p>
                 </div>
@@ -677,7 +677,7 @@ export const AdminDashboard: React.FC = () => {
                   <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">
                     {drivers.filter((d) => d.verificationStatus === 'pending').length} Pending Review
                   </span>
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold text-neutral-600">
+                  <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs font-bold text-ink-2">
                     {drivers.length} Total
                   </span>
                 </div>
@@ -696,10 +696,10 @@ export const AdminDashboard: React.FC = () => {
                         key={filter}
                         type="button"
                         onClick={() => setDriverStatusFilter(filter)}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition-all ${
+                        className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize transition-all ${
                           driverStatusFilter === filter
-                            ? 'bg-[#111111] text-white shadow-xs'
-                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                            ? 'bg-ink text-white shadow-card'
+                            : 'bg-surface-2 text-ink-2 hover:bg-neutral-200'
                         }`}
                       >
                         {filter === 'all' ? 'All Drivers' : filter} ({count})
@@ -715,7 +715,7 @@ export const AdminDashboard: React.FC = () => {
                     value={driverSearchTerm}
                     onChange={(e) => setDriverSearchTerm(e.target.value)}
                     placeholder="Search name, phone, reg..."
-                    className="w-full rounded-xl border border-[#E5E5E5] bg-[#F9FAFB] pl-8 pr-3 py-1.5 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                    className="w-full rounded-input border border-line bg-surface-2 pl-8 pr-3 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -752,17 +752,17 @@ export const AdminDashboard: React.FC = () => {
                     return (
                       <div
                         key={drv.userId}
-                        className="flex flex-col md:flex-row items-start md:items-center justify-between rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-4 gap-3 hover:border-neutral-300 transition-all"
+                        className="flex flex-col md:flex-row items-start md:items-center justify-between rounded-card border border-line bg-surface-2 p-4 gap-3 hover:border-neutral-300 transition-all"
                       >
                         <div className="flex items-start sm:items-center gap-3 min-w-0">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFC107] text-[#111111] font-black text-base shadow-xs">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-primary text-ink font-bold text-base shadow-card">
                             {drv.name.charAt(0)}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-sm font-black text-[#111111] truncate">{drv.name}</h4>
+                              <h4 className="text-sm font-bold text-ink truncate">{drv.name}</h4>
                               <span
-                                className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                                   drv.verificationStatus === 'approved'
                                     ? 'bg-emerald-100 text-emerald-800'
                                     : drv.verificationStatus === 'pending'
@@ -772,23 +772,23 @@ export const AdminDashboard: React.FC = () => {
                               >
                                 {drv.verificationStatus}
                               </span>
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-800 border border-blue-200">
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-800 border border-blue-200">
                                 {verifiedCount}/5 Docs Approved
                               </span>
                             </div>
-                            <p className="text-[11px] text-neutral-600 mt-0.5">
+                            <p className="text-[11px] text-ink-2 mt-0.5">
                               {drv.vehicle
                                 ? `${drv.vehicle.colour} ${drv.vehicle.make} ${drv.vehicle.model} • ${drv.vehicle.registrationNumber} (${drv.vehicle.year})`
                                 : 'No vehicle registered'}
                             </p>
-                            <div className="mt-1 flex flex-wrap items-center gap-3 text-[10px] text-neutral-400">
+                            <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-neutral-400">
                               <span>Phone: {drv.phone || 'N/A'}</span>
                               <span>Rating: {drv.rating?.toFixed(1) || '5.0'} ★</span>
                               <span>Trips: {drv.totalTrips || 0}</span>
                               <span>Earnings: {fareService.formatZAR(drv.totalEarnings || 0)}</span>
                               {drv.online && (
-                                <span className="flex items-center gap-1 font-bold text-emerald-600">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                <span className="flex items-center gap-1 font-bold text-success">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-ping" />
                                   Online Now
                                 </span>
                               )}
@@ -797,13 +797,13 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-[#E5E5E5] pt-2 md:pt-0">
+                        <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-line pt-2 md:pt-0">
                           <button
                             type="button"
                             onClick={() => setSelectedDriverForReview(drv)}
-                            className="flex items-center gap-1.5 rounded-xl border border-neutral-300 bg-white px-3 py-1.5 text-xs font-bold text-[#111111] shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all"
+                            className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-bold text-ink hover:bg-surface-2 active:scale-95 transition-all"
                           >
-                            <Eye className="h-3.5 w-3.5 text-neutral-600" />
+                            <Eye className="h-3.5 w-3.5 text-ink-2" />
                             <span>Review Docs</span>
                           </button>
 
@@ -811,7 +811,7 @@ export const AdminDashboard: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleApproveDriver(drv.userId)}
-                              className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 transition-all"
+                              className="flex items-center gap-1 rounded-full bg-success px-3 py-1.5 text-xs font-bold text-white shadow-card hover:bg-emerald-700 active:scale-95 transition-all"
                             >
                               <Check className="h-3.5 w-3.5" />
                               <span>Approve</span>
@@ -829,7 +829,7 @@ export const AdminDashboard: React.FC = () => {
                                   reason: '',
                                 })
                               }
-                              className="flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100 active:scale-95 transition-all"
+                              className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-danger hover:bg-red-100 active:scale-95 transition-all"
                             >
                               <X className="h-3.5 w-3.5" />
                               <span>Revoke</span>
@@ -841,7 +841,7 @@ export const AdminDashboard: React.FC = () => {
                   })}
 
                 {drivers.length === 0 && (
-                  <div className="rounded-2xl border border-dashed border-[#E5E5E5] p-8 text-center text-xs text-neutral-400">
+                  <div className="rounded-card border border-dashed border-line p-8 text-center text-xs text-neutral-400">
                     No drivers registered on the platform yet.
                   </div>
                 )}
@@ -849,11 +849,11 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* AUDIT TRAIL LOGS */}
-            <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-3">
+            <div className="rounded-card border border-line bg-white p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4 text-[#FFC107]" />
-                  <h3 className="text-sm font-black text-[#111111]">Compliance & Admin Audit Trail</h3>
+                  <ClipboardList className="h-4 w-4 text-primary-text" />
+                  <h3 className="text-sm font-bold text-ink">Compliance & Admin Audit Trail</h3>
                 </div>
                 <span className="text-[11px] font-bold text-neutral-400">
                   {auditLogs.length} Recent Events
@@ -863,7 +863,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E5E5E5] text-neutral-400 font-bold uppercase text-[10px]">
+                    <tr className="border-b border-line text-neutral-400 font-bold uppercase text-[11px]">
                       <th className="pb-2">Timestamp</th>
                       <th className="pb-2">Admin</th>
                       <th className="pb-2">Action</th>
@@ -871,10 +871,10 @@ export const AdminDashboard: React.FC = () => {
                       <th className="pb-2">Details</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E5E5E5]">
+                  <tbody className="divide-y divide-line">
                     {auditLogs.slice(0, 15).map((log, idx) => (
-                      <tr key={log.id || idx} className="hover:bg-[#F9FAFB]">
-                        <td className="py-2.5 text-neutral-500 font-mono text-[11px] whitespace-nowrap">
+                      <tr key={log.id || idx} className="hover:bg-surface-2">
+                        <td className="py-2.5 text-ink-3 font-mono text-[11px] whitespace-nowrap">
                           {new Date(log.timestamp).toLocaleString([], {
                             month: 'short',
                             day: 'numeric',
@@ -882,24 +882,24 @@ export const AdminDashboard: React.FC = () => {
                             minute: '2-digit',
                           })}
                         </td>
-                        <td className="py-2.5 font-bold text-[#111111]">{log.adminEmail}</td>
+                        <td className="py-2.5 font-bold text-ink">{log.adminEmail}</td>
                         <td className="py-2.5">
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                               log.action.includes('approve')
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : log.action.includes('reject') || log.action.includes('revoke')
                                 ? 'bg-red-100 text-red-800'
-                                : 'bg-neutral-100 text-neutral-800'
+                                : 'bg-surface-2 text-ink'
                             }`}
                           >
                             {log.action.replace('_', ' ')}
                           </span>
                         </td>
-                        <td className="py-2.5 font-mono text-[11px] text-neutral-600 truncate max-w-[120px]">
+                        <td className="py-2.5 font-mono text-[11px] text-ink-2 truncate max-w-[120px]">
                           {log.targetId}
                         </td>
-                        <td className="py-2.5 text-neutral-600">{log.details}</td>
+                        <td className="py-2.5 text-ink-2">{log.details}</td>
                       </tr>
                     ))}
                     {auditLogs.length === 0 && (
@@ -918,11 +918,11 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 4: RIDES & DISPATCH */}
         {activeTab === 'rides' && (
-          <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
+          <div className="rounded-card border border-line bg-white p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
-                <h3 className="text-base font-black text-[#111111]">Platform Rides Ledger</h3>
-                <p className="text-xs text-neutral-500">Complete trip lifecycles in Firestore</p>
+                <h3 className="text-base font-bold text-ink">Platform Rides Ledger</h3>
+                <p className="text-xs text-ink-3">Complete trip lifecycles in Firestore</p>
               </div>
               <span className="text-xs font-bold text-neutral-400">{rides.length} Total</span>
             </div>
@@ -930,7 +930,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#E5E5E5] text-neutral-400 font-bold uppercase text-[10px]">
+                  <tr className="border-b border-line text-neutral-400 font-bold uppercase text-[11px]">
                     <th className="pb-2">Ride ID</th>
                     <th className="pb-2">Passenger</th>
                     <th className="pb-2">Driver</th>
@@ -940,29 +940,29 @@ export const AdminDashboard: React.FC = () => {
                     <th className="pb-2">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E5E5E5]">
+                <tbody className="divide-y divide-line">
                   {rides.map((r) => (
-                    <tr key={r.id} className="hover:bg-[#F9FAFB]">
-                      <td className="py-3 font-mono text-[11px] text-neutral-500">
+                    <tr key={r.id} className="hover:bg-surface-2">
+                      <td className="py-3 font-mono text-[11px] text-ink-3">
                         {r.id.substring(0, 8)}...
                       </td>
-                      <td className="py-3 font-bold text-[#111111]">{r.passengerName}</td>
-                      <td className="py-3 text-neutral-600">{r.driverName || 'Unassigned'}</td>
-                      <td className="py-3 font-bold uppercase text-neutral-500">{r.rideType}</td>
-                      <td className="py-3 text-neutral-600 max-w-[200px] truncate">
+                      <td className="py-3 font-bold text-ink">{r.passengerName}</td>
+                      <td className="py-3 text-ink-2">{r.driverName || 'Unassigned'}</td>
+                      <td className="py-3 font-bold uppercase text-ink-3">{r.rideType}</td>
+                      <td className="py-3 text-ink-2 max-w-[200px] truncate">
                         {r.destinationAddress}
                       </td>
-                      <td className="py-3 font-mono font-bold text-[#111111]">
+                      <td className="py-3 font-mono font-bold text-ink">
                         {fareService.formatZAR(r.estimatedFare)}
                       </td>
                       <td className="py-3">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
                             r.status === 'completed'
                               ? 'bg-emerald-100 text-emerald-800'
                               : r.status === 'in_progress'
                               ? 'bg-amber-100 text-amber-800'
-                              : 'bg-neutral-200 text-neutral-700'
+                              : 'bg-neutral-200 text-ink-2'
                           }`}
                         >
                           {r.status}
@@ -978,10 +978,10 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 5: VEHICLE FLEET */}
         {activeTab === 'vehicles' && (
-          <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-            <div className="border-b border-[#E5E5E5] pb-4">
-              <h3 className="text-base font-black text-[#111111]">Active Vehicle Fleet</h3>
-              <p className="text-xs text-neutral-500">Vehicles mapped to certified drivers</p>
+          <div className="rounded-card border border-line bg-white p-5 space-y-4">
+            <div className="border-b border-line pb-4">
+              <h3 className="text-base font-bold text-ink">Active Vehicle Fleet</h3>
+              <p className="text-xs text-ink-3">Vehicles mapped to certified drivers</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -990,28 +990,28 @@ export const AdminDashboard: React.FC = () => {
                 .map((d) => (
                   <div
                     key={d.userId}
-                    className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-4 space-y-2"
+                    className="rounded-card border border-line bg-surface-2 p-4 space-y-2"
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFC107] text-[#111111]">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-ink">
                           <Car className="h-5 w-5" />
                         </div>
                         <div>
-                          <h4 className="text-xs font-bold text-[#111111]">
+                          <h4 className="text-xs font-bold text-ink">
                             {d.vehicle?.make} {d.vehicle?.model}
                           </h4>
-                          <span className="font-mono text-[10px] font-bold text-neutral-500">
+                          <span className="font-mono text-[11px] font-bold text-ink-3">
                             {d.vehicle?.registrationNumber}
                           </span>
                         </div>
                       </div>
-                      <span className="rounded bg-neutral-200 px-2 py-0.5 text-[9px] font-bold uppercase">
+                      <span className="rounded bg-neutral-200 px-2 py-0.5 text-[11px] font-bold uppercase">
                         {d.vehicle?.vehicleType}
                       </span>
                     </div>
-                    <div className="border-t border-[#E5E5E5] pt-2 text-[11px] text-neutral-600">
-                      <p>Driver: <span className="font-bold text-[#111111]">{d.name}</span></p>
+                    <div className="border-t border-line pt-2 text-[11px] text-ink-2">
+                      <p>Driver: <span className="font-bold text-ink">{d.name}</span></p>
                       <p>Color: {d.vehicle?.colour}</p>
                     </div>
                   </div>
@@ -1024,16 +1024,16 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'payments' && (
           <div className="space-y-5">
             {/* Gateway Configuration Status Card */}
-            <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5E5E5] pb-4">
+            <div className="rounded-card border border-line bg-white p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-black text-[#FFC107]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-card bg-black text-white">
                     <CreditCard className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-[#111111] flex items-center gap-2">
+                    <h3 className="text-base font-bold text-ink flex items-center gap-2">
                       Peach Payments Gateway Integration
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                         gatewayConfig?.isConfigured
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-amber-100 text-amber-800'
@@ -1043,13 +1043,13 @@ export const AdminDashboard: React.FC = () => {
                           : 'READY — PENDING CREDENTIALS'}
                       </span>
                     </h3>
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-xs text-ink-3">
                       South African Merchant Gateway (Visa, Mastercard, Instant EFT, 3D Secure)
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-mono font-bold text-neutral-700">
+                  <span className="rounded-xl border border-line bg-surface-2 px-3 py-1.5 text-xs font-mono font-bold text-ink-2">
                     Split: 85% Driver / 15% Platform
                   </span>
                 </div>
@@ -1057,32 +1057,32 @@ export const AdminDashboard: React.FC = () => {
 
               {/* Status & Webhook Specs */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div className="rounded-2xl border border-neutral-100 bg-[#F9FAFB] p-3">
-                  <span className="text-[10px] font-bold uppercase text-neutral-400">Environment</span>
-                  <p className="font-bold text-[#111111] capitalize mt-0.5">
+                <div className="rounded-card border border-line bg-surface-2 p-3">
+                  <span className="text-[11px] font-bold uppercase text-neutral-400">Environment</span>
+                  <p className="font-bold text-ink capitalize mt-0.5">
                     {gatewayConfig?.env || 'Sandbox / Testsecure'}
                   </p>
-                  <p className="text-[11px] text-neutral-500 mt-1">
+                  <p className="text-[11px] text-ink-3 mt-1">
                     Base URL: {gatewayConfig?.env === 'production' ? 'secure.peachpayments.com' : 'testsecure.peachpayments.com'}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-neutral-100 bg-[#F9FAFB] p-3">
-                  <span className="text-[10px] font-bold uppercase text-neutral-400">Webhook Listener</span>
-                  <p className="font-mono font-bold text-[#111111] mt-0.5 truncate">
+                <div className="rounded-card border border-line bg-surface-2 p-3">
+                  <span className="text-[11px] font-bold uppercase text-neutral-400">Webhook Listener</span>
+                  <p className="font-mono font-bold text-ink mt-0.5 truncate">
                     /api/payments/peach/webhook
                   </p>
-                  <p className="text-[11px] text-neutral-500 mt-1">
+                  <p className="text-[11px] text-ink-3 mt-1">
                     Signature verification: HMAC-SHA256
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-neutral-100 bg-[#F9FAFB] p-3">
-                  <span className="text-[10px] font-bold uppercase text-neutral-400">Merchant Onboarding Status</span>
-                  <p className={`font-bold mt-0.5 ${gatewayConfig?.isConfigured ? 'text-emerald-700' : 'text-amber-700'}`}>
+                <div className="rounded-card border border-line bg-surface-2 p-3">
+                  <span className="text-[11px] font-bold uppercase text-neutral-400">Merchant Onboarding Status</span>
+                  <p className={`font-bold mt-0.5 ${gatewayConfig?.isConfigured ? 'text-success' : 'text-amber-700'}`}>
                     {gatewayConfig?.isConfigured ? 'Configured & Active' : 'Awaiting Merchant Credentials'}
                   </p>
-                  <p className="text-[11px] text-neutral-500 mt-1">
+                  <p className="text-[11px] text-ink-3 mt-1">
                     {gatewayConfig?.isConfigured
                       ? 'Checkout v2 endpoints active.'
                       : 'Set PEACH_ENTITY_ID and PEACH_SECRET_TOKEN in .env'}
@@ -1091,7 +1091,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {!gatewayConfig?.isConfigured && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900">
+                <div className="rounded-card border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900">
                   <p className="font-bold text-amber-950">
                     ZAKA PAYMENT INTEGRATION IMPLEMENTED — AWAITING PEACH MERCHANT CREDENTIALS AND PRODUCTION ONBOARDING
                   </p>
@@ -1103,15 +1103,15 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Platform Financial Ledger */}
-            <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
+            <div className="rounded-card border border-line bg-white p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-base font-black text-[#111111]">Platform Financial Ledger</h3>
-                  <p className="text-xs text-neutral-500">Authoritative payment transactions, gateway refs, and driver payouts</p>
+                  <h3 className="text-base font-bold text-ink">Platform Financial Ledger</h3>
+                  <p className="text-xs text-ink-3">Authoritative payment transactions, gateway refs, and driver payouts</p>
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-bold text-neutral-400 block">Gross Merchandise Value</span>
-                  <span className="text-base font-black text-[#111111]">
+                  <span className="text-base font-bold text-ink">
                     {fareService.formatZAR(totalGmv)}
                   </span>
                 </div>
@@ -1120,7 +1120,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E5E5E5] text-neutral-400 font-bold uppercase text-[10px]">
+                    <tr className="border-b border-line text-neutral-400 font-bold uppercase text-[11px]">
                       <th className="pb-2">Tx Ref / ID</th>
                       <th className="pb-2">Gateway / Provider</th>
                       <th className="pb-2">Total Fare</th>
@@ -1131,7 +1131,7 @@ export const AdminDashboard: React.FC = () => {
                       <th className="pb-2">Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E5E5E5]">
+                  <tbody className="divide-y divide-line">
                     {payments.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-8 text-center text-neutral-400 text-xs">
@@ -1146,27 +1146,27 @@ export const AdminDashboard: React.FC = () => {
                         const isSettled = p.paymentStatus === 'paid';
 
                         return (
-                          <tr key={p.id || idx} className="hover:bg-[#F9FAFB]">
-                            <td className="py-3 font-mono font-bold text-neutral-700">
+                          <tr key={p.id || idx} className="hover:bg-surface-2">
+                            <td className="py-3 font-mono font-bold text-ink-2">
                               {p.transactionReference || p.merchantTransactionId || (p.id ? p.id.substring(0, 12) : 'REF-N/A')}
                             </td>
-                            <td className="py-3 font-semibold text-neutral-600 capitalize">
+                            <td className="py-3 font-semibold text-ink-2 capitalize">
                               {p.provider === 'peach' ? 'Peach Payments' : p.provider || 'Cash Direct'}
                             </td>
-                            <td className="py-3 font-bold text-[#111111]">
+                            <td className="py-3 font-bold text-ink">
                               {fareService.formatZAR(amount)}
                             </td>
                             <td className="py-3 text-amber-600 font-bold">
                               {fareService.formatZAR(platformFee)}
                             </td>
-                            <td className="py-3 text-emerald-600 font-bold">
+                            <td className="py-3 text-success font-bold">
                               {fareService.formatZAR(driverEarnings)}
                             </td>
-                            <td className="py-3 uppercase font-semibold text-neutral-500">
+                            <td className="py-3 uppercase font-semibold text-ink-3">
                               {p.paymentMethod}
                             </td>
                             <td className="py-3">
-                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
                                 isSettled
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : 'bg-amber-100 text-amber-800'
@@ -1190,11 +1190,11 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 7: RATINGS & QUALITY */}
         {activeTab === 'ratings' && (
-          <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
+          <div className="rounded-card border border-line bg-white p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
-                <h3 className="text-base font-black text-[#111111]">Ratings & Community Quality</h3>
-                <p className="text-xs text-neutral-500">Passenger & driver reviews, compliments, and tips</p>
+                <h3 className="text-base font-bold text-ink">Ratings & Community Quality</h3>
+                <p className="text-xs text-ink-3">Passenger & driver reviews, compliments, and tips</p>
               </div>
               <span className="text-xs font-bold text-neutral-400">{ratings.length} Reviews Recorded</span>
             </div>
@@ -1202,7 +1202,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#E5E5E5] text-neutral-400 font-bold uppercase text-[10px]">
+                  <tr className="border-b border-line text-neutral-400 font-bold uppercase text-[11px]">
                     <th className="pb-2">Trip Ref</th>
                     <th className="pb-2">Direction</th>
                     <th className="pb-2">Score</th>
@@ -1211,7 +1211,7 @@ export const AdminDashboard: React.FC = () => {
                     <th className="pb-2">Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E5E5E5]">
+                <tbody className="divide-y divide-line">
                   {ratings.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-neutral-400 text-xs">
@@ -1220,12 +1220,12 @@ export const AdminDashboard: React.FC = () => {
                     </tr>
                   ) : (
                     ratings.map((rat) => (
-                      <tr key={rat.id} className="hover:bg-[#F9FAFB]">
-                        <td className="py-3 font-mono text-[11px] text-neutral-500">
+                      <tr key={rat.id} className="hover:bg-surface-2">
+                        <td className="py-3 font-mono text-[11px] text-ink-3">
                           {rat.rideId.substring(0, 8)}...
                         </td>
                         <td className="py-3 font-bold capitalize">
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                          <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${
                             rat.fromRole === 'passenger'
                               ? 'bg-blue-100 text-blue-800'
                               : 'bg-amber-100 text-amber-900'
@@ -1234,15 +1234,15 @@ export const AdminDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3">
-                          <div className="flex items-center gap-1 font-black text-[#111111]">
-                            <Star className="h-3.5 w-3.5 fill-[#FFC107] text-[#FFC107]" />
+                          <div className="flex items-center gap-1 font-bold text-ink">
+                            <Star className="h-3.5 w-3.5 fill-primary text-primary" />
                             <span>{rat.rating}.0</span>
                           </div>
                         </td>
-                        <td className="py-3 text-neutral-600 max-w-xs">
+                        <td className="py-3 text-ink-2 max-w-xs">
                           {rat.comment || <span className="text-neutral-300 italic">No text provided</span>}
                         </td>
-                        <td className="py-3 font-bold text-emerald-600">
+                        <td className="py-3 font-bold text-success">
                           {rat.tip && rat.tip > 0 ? fareService.formatZAR(rat.tip) : '—'}
                         </td>
                         <td className="py-3 text-neutral-400">
@@ -1259,23 +1259,23 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 8: BROADCAST NOTIFICATIONS */}
         {activeTab === 'notifications' && (
-          <div className="max-w-xl rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-            <div className="border-b border-[#E5E5E5] pb-3">
-              <h3 className="text-base font-black text-[#111111]">Broadcast Platform Alert</h3>
-              <p className="text-xs text-neutral-500">
+          <div className="max-w-xl rounded-card border border-line bg-white p-5 space-y-4">
+            <div className="border-b border-line pb-3">
+              <h3 className="text-base font-bold text-ink">Broadcast Platform Alert</h3>
+              <p className="text-xs text-ink-3">
                 Send real-time in-app announcements to all registered passengers and drivers
               </p>
             </div>
 
             {broadcastSuccess && (
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-800">
+              <div className="rounded-card bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-800">
                 Broadcast notification successfully delivered to {users.length} users!
               </div>
             )}
 
             <form onSubmit={handleSendBroadcast} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-[#111111] mb-1">
+                <label className="block text-xs font-bold text-ink mb-1">
                   Notification Title
                 </label>
                 <input
@@ -1283,13 +1283,13 @@ export const AdminDashboard: React.FC = () => {
                   value={broadcastTitle}
                   onChange={(e) => setBroadcastTitle(e.target.value)}
                   placeholder="e.g. Weekend Promo: 20% off Sandton Rides"
-                  className="w-full rounded-xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                  className="w-full rounded-input border border-line bg-surface-2 p-2.5 text-xs text-ink focus:border-primary focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#111111] mb-1">
+                <label className="block text-xs font-bold text-ink mb-1">
                   Message Content
                 </label>
                 <textarea
@@ -1297,7 +1297,7 @@ export const AdminDashboard: React.FC = () => {
                   onChange={(e) => setBroadcastMsg(e.target.value)}
                   placeholder="Type announcement message here..."
                   rows={3}
-                  className="w-full rounded-xl border border-[#E5E5E5] bg-[#F9FAFB] p-2.5 text-xs text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                  className="w-full rounded-input border border-line bg-surface-2 p-2.5 text-xs text-ink focus:border-primary focus:outline-none"
                   required
                 />
               </div>
@@ -1305,7 +1305,7 @@ export const AdminDashboard: React.FC = () => {
               <button
                 type="submit"
                 disabled={isBroadcasting}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-[#FFC107] py-3 text-xs font-black text-[#111111] shadow-md hover:bg-[#FFB300] active:scale-[0.99] transition-all w-full"
+                className="flex items-center justify-center gap-2 rounded-full bg-primary py-3 text-xs font-bold text-ink shadow-card hover:bg-primary-hover active:bg-primary-pressed active:scale-[0.99] transition-all w-full"
               >
                 <Send className="h-3.5 w-3.5" />
                 <span>{isBroadcasting ? 'Broadcasting...' : 'Send to All Users'}</span>
@@ -1317,16 +1317,16 @@ export const AdminDashboard: React.FC = () => {
         {/* TAB 8: FARE ARCHITECTURE CONFIG */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-[#E5E5E5] pb-4 gap-3">
+            <div className="rounded-card border border-line bg-white p-5 ">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-line pb-4 gap-3">
                 <div>
-                  <h3 className="text-base font-black text-[#111111]">ZAKA Fare Rate Architecture</h3>
-                  <p className="text-xs text-neutral-500">
+                  <h3 className="text-base font-bold text-ink">ZAKA Fare Rate Architecture</h3>
+                  <p className="text-xs text-ink-3">
                     Live Firestore configuration: Base Fare + (Distance × Per-KM) + (Duration × Per-Minute)
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900 flex items-center gap-1.5">
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
                     Live in ZAR (R)
                   </span>
@@ -1334,8 +1334,8 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {pricingSuccessMsg && (
-                <div className="mt-4 rounded-2xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-600" />
+                <div className="mt-4 rounded-card bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                  <Check className="h-4 w-4 text-success" />
                   <span>{pricingSuccessMsg}</span>
                 </div>
               )}
@@ -1349,20 +1349,20 @@ export const AdminDashboard: React.FC = () => {
                   return (
                     <div
                       key={vt}
-                      className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-5 space-y-4 shadow-sm"
+                      className="rounded-card border border-line bg-surface-2 p-5 space-y-4 "
                     >
-                      <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-3">
+                      <div className="flex items-center justify-between border-b border-line pb-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFC107] font-black text-xs text-[#111111]">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary font-bold text-xs text-ink">
                             {vt === 'economy' ? '🚗' : vt === 'comfort' ? '✨' : vt === 'xl' ? '🚙' : '🏍️'}
                           </div>
                           <div>
-                            <h4 className="text-sm font-black text-[#111111] uppercase">{current.name}</h4>
-                            <p className="text-[11px] text-neutral-500">{current.tagline}</p>
+                            <h4 className="text-sm font-bold text-ink uppercase">{current.name}</h4>
+                            <p className="text-[11px] text-ink-3">{current.tagline}</p>
                           </div>
                         </div>
 
-                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-neutral-700">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-ink-2">
                           <input
                             type="checkbox"
                             checked={current.active !== false}
@@ -1372,7 +1372,7 @@ export const AdminDashboard: React.FC = () => {
                                 [vt]: { ...prev[vt], active: e.target.checked },
                               }))
                             }
-                            className="rounded border-[#E5E5E5] text-[#FFC107] focus:ring-[#FFC107]"
+                            className="rounded border-line text-primary-text focus:ring-primary"
                           />
                           <span>Active</span>
                         </label>
@@ -1381,7 +1381,7 @@ export const AdminDashboard: React.FC = () => {
                       {/* Config Inputs */}
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div>
-                          <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                          <label className="block text-[11px] font-bold text-ink-2 mb-1">
                             Base Fare (R)
                           </label>
                           <div className="relative">
@@ -1397,13 +1397,13 @@ export const AdminDashboard: React.FC = () => {
                                   [vt]: { ...prev[vt], baseFare: parseFloat(e.target.value) || 0 },
                                 }))
                               }
-                              className="w-full rounded-xl border border-[#E5E5E5] bg-white pl-7 pr-3 py-2 text-xs font-bold text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                              className="w-full rounded-input border border-line bg-white pl-7 pr-3 py-2 text-xs font-bold text-ink focus:border-primary focus:outline-none"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                          <label className="block text-[11px] font-bold text-ink-2 mb-1">
                             Per Kilometer Rate (R/km)
                           </label>
                           <div className="relative">
@@ -1419,13 +1419,13 @@ export const AdminDashboard: React.FC = () => {
                                   [vt]: { ...prev[vt], perKmRate: parseFloat(e.target.value) || 0 },
                                 }))
                               }
-                              className="w-full rounded-xl border border-[#E5E5E5] bg-white pl-7 pr-3 py-2 text-xs font-bold text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                              className="w-full rounded-input border border-line bg-white pl-7 pr-3 py-2 text-xs font-bold text-ink focus:border-primary focus:outline-none"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                          <label className="block text-[11px] font-bold text-ink-2 mb-1">
                             Per Minute Rate (R/min)
                           </label>
                           <div className="relative">
@@ -1441,13 +1441,13 @@ export const AdminDashboard: React.FC = () => {
                                   [vt]: { ...prev[vt], perMinuteRate: parseFloat(e.target.value) || 0 },
                                 }))
                               }
-                              className="w-full rounded-xl border border-[#E5E5E5] bg-white pl-7 pr-3 py-2 text-xs font-bold text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                              className="w-full rounded-input border border-line bg-white pl-7 pr-3 py-2 text-xs font-bold text-ink focus:border-primary focus:outline-none"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                          <label className="block text-[11px] font-bold text-ink-2 mb-1">
                             Minimum Fare (R)
                           </label>
                           <div className="relative">
@@ -1463,13 +1463,13 @@ export const AdminDashboard: React.FC = () => {
                                   [vt]: { ...prev[vt], minimumFare: parseFloat(e.target.value) || 0 },
                                 }))
                               }
-                              className="w-full rounded-xl border border-[#E5E5E5] bg-white pl-7 pr-3 py-2 text-xs font-bold text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                              className="w-full rounded-input border border-line bg-white pl-7 pr-3 py-2 text-xs font-bold text-ink focus:border-primary focus:outline-none"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                          <label className="block text-[11px] font-bold text-ink-2 mb-1">
                             Passenger Capacity
                           </label>
                           <input
@@ -1483,7 +1483,7 @@ export const AdminDashboard: React.FC = () => {
                                 [vt]: { ...prev[vt], passengerCapacity: parseInt(e.target.value, 10) || 1 },
                               }))
                             }
-                            className="w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-2 text-xs font-bold text-[#111111] focus:border-[#FFC107] focus:outline-none"
+                            className="w-full rounded-input border border-line bg-white px-3 py-2 text-xs font-bold text-ink focus:border-primary focus:outline-none"
                           />
                         </div>
 
@@ -1491,7 +1491,7 @@ export const AdminDashboard: React.FC = () => {
                           <button
                             onClick={() => handleSavePricingTier(vt)}
                             disabled={isSaving}
-                            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#111111] py-2 text-xs font-bold text-[#FFC107] shadow-sm hover:bg-neutral-800 disabled:opacity-50"
+                            className="flex w-full items-center justify-center gap-1.5 rounded-full bg-ink py-2 text-xs font-bold text-white shadow-card hover:bg-ink disabled:opacity-50"
                           >
                             <Save className="h-3.5 w-3.5" />
                             <span>{isSaving ? 'Saving...' : 'Save to Firestore'}</span>
@@ -1505,13 +1505,13 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* LIVE SIMULATOR BENCH */}
-            <div className="rounded-3xl border border-[#E5E5E5] bg-white p-5 shadow-sm space-y-4">
-              <div className="border-b border-[#E5E5E5] pb-3 flex items-center justify-between">
+            <div className="rounded-card border border-line bg-white p-5 space-y-4">
+              <div className="border-b border-line pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-[#FFC107]" />
+                  <Calculator className="h-5 w-5 text-primary-text" />
                   <div>
-                    <h3 className="text-sm font-black text-[#111111]">Real-time Fare Simulator</h3>
-                    <p className="text-[11px] text-neutral-500">
+                    <h3 className="text-sm font-bold text-ink">Real-time Fare Simulator</h3>
+                    <p className="text-[11px] text-ink-3">
                       Verify passenger estimated fares with minimum fare protection across all categories
                     </p>
                   </div>
@@ -1520,8 +1520,8 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1">
-                    Trip Distance: <span className="text-[#111111] font-black">{simDistance} km</span>
+                  <label className="block text-xs font-bold text-ink-2 mb-1">
+                    Trip Distance: <span className="text-ink font-bold">{simDistance} km</span>
                   </label>
                   <input
                     type="range"
@@ -1530,12 +1530,12 @@ export const AdminDashboard: React.FC = () => {
                     step="0.5"
                     value={simDistance}
                     onChange={(e) => setSimDistance(parseFloat(e.target.value))}
-                    className="w-full accent-[#FFC107]"
+                    className="w-full accent-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1">
-                    Trip Duration: <span className="text-[#111111] font-black">{simDuration} mins</span>
+                  <label className="block text-xs font-bold text-ink-2 mb-1">
+                    Trip Duration: <span className="text-ink font-bold">{simDuration} mins</span>
                   </label>
                   <input
                     type="range"
@@ -1544,7 +1544,7 @@ export const AdminDashboard: React.FC = () => {
                     step="1"
                     value={simDuration}
                     onChange={(e) => setSimDuration(parseInt(e.target.value, 10))}
-                    className="w-full accent-[#FFC107]"
+                    className="w-full accent-primary"
                   />
                 </div>
               </div>
@@ -1558,20 +1558,20 @@ export const AdminDashboard: React.FC = () => {
                   return (
                     <div
                       key={vt}
-                      className="rounded-2xl border border-[#E5E5E5] bg-[#F9FAFB] p-3.5 space-y-1.5 text-xs"
+                      className="rounded-card border border-line bg-surface-2 p-3.5 space-y-1.5 text-xs"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-black text-[#111111] uppercase">{conf.name}</span>
+                        <span className="font-bold text-ink uppercase">{conf.name}</span>
                         {breakdown.isMinimumFareApplied && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-800">
                             MIN FARE
                           </span>
                         )}
                       </div>
-                      <div className="text-xl font-black text-[#111111]">
+                      <div className="text-xl font-bold text-ink">
                         {fareService.formatZAR(breakdown.totalFare)}
                       </div>
-                      <div className="text-[10px] text-neutral-500 space-y-0.5 pt-1 border-t border-[#E5E5E5]">
+                      <div className="text-[11px] text-ink-3 space-y-0.5 pt-1 border-t border-line">
                         <div className="flex justify-between">
                           <span>Base:</span>
                           <span>{fareService.formatZAR(breakdown.baseFare)}</span>
@@ -1596,19 +1596,19 @@ export const AdminDashboard: React.FC = () => {
 
       {/* MODAL 1: DRIVER COMPLIANCE & DOCUMENT INSPECTION */}
       {selectedDriverForReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-neutral-200 space-y-5 my-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-[20px] bg-white p-6 shadow-modal border border-line space-y-5 my-8 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-neutral-200 pb-4">
+            <div className="flex items-start justify-between border-b border-line pb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFC107] text-[#111111] font-black text-lg shadow-xs">
+                <div className="flex h-12 w-12 items-center justify-center rounded-card bg-primary text-ink font-bold text-lg shadow-card">
                   {selectedDriverForReview.name.charAt(0)}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black text-[#111111]">{selectedDriverForReview.name}</h3>
+                    <h3 className="text-base font-bold text-ink">{selectedDriverForReview.name}</h3>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                         selectedDriverForReview.verificationStatus === 'approved'
                           ? 'bg-emerald-100 text-emerald-800'
                           : selectedDriverForReview.verificationStatus === 'pending'
@@ -1619,7 +1619,7 @@ export const AdminDashboard: React.FC = () => {
                       {selectedDriverForReview.verificationStatus}
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-500 mt-0.5">
+                  <p className="text-xs text-ink-3 mt-0.5">
                     ID: <span className="font-mono text-[11px]">{selectedDriverForReview.userId}</span> • Phone: {selectedDriverForReview.phone || 'N/A'}
                   </p>
                 </div>
@@ -1628,45 +1628,45 @@ export const AdminDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedDriverForReview(null)}
-                className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                className="rounded-full p-1.5 text-neutral-400 hover:bg-surface-2 hover:text-ink-2 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Vehicle Details Card */}
-            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3.5 text-xs space-y-2">
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
+            <div className="rounded-card border border-line bg-surface-2 p-3.5 text-xs space-y-2">
+              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
                 Registered Motor Vehicle
               </span>
               {selectedDriverForReview.vehicle ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[#111111]">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-ink">
                   <div>
-                    <span className="text-neutral-400 block text-[10px]">Make & Model</span>
+                    <span className="text-neutral-400 block text-[11px]">Make & Model</span>
                     <span className="font-bold">{selectedDriverForReview.vehicle.make} {selectedDriverForReview.vehicle.model}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-400 block text-[10px]">Registration</span>
+                    <span className="text-neutral-400 block text-[11px]">Registration</span>
                     <span className="font-mono font-bold">{selectedDriverForReview.vehicle.registrationNumber}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-400 block text-[10px]">Colour / Year</span>
+                    <span className="text-neutral-400 block text-[11px]">Colour / Year</span>
                     <span className="font-bold">{selectedDriverForReview.vehicle.colour} ({selectedDriverForReview.vehicle.year})</span>
                   </div>
                   <div>
-                    <span className="text-neutral-400 block text-[10px]">Category</span>
+                    <span className="text-neutral-400 block text-[11px]">Category</span>
                     <span className="font-bold capitalize">{selectedDriverForReview.vehicle.vehicleType}</span>
                   </div>
                 </div>
               ) : (
-                <p className="text-neutral-500 italic">No vehicle currently linked to this profile.</p>
+                <p className="text-ink-3 italic">No vehicle currently linked to this profile.</p>
               )}
             </div>
 
             {/* Rejection Reason Notice if previously rejected */}
             {selectedDriverForReview.verificationStatus === 'rejected' && selectedDriverForReview.rejectionReason && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-900 flex items-start gap-2.5">
-                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+              <div className="rounded-card border border-red-200 bg-red-50 p-3.5 text-xs text-red-900 flex items-start gap-2.5">
+                <AlertCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold block">Current Rejection Reason:</span>
                   <p className="mt-0.5">{selectedDriverForReview.rejectionReason}</p>
@@ -1677,10 +1677,10 @@ export const AdminDashboard: React.FC = () => {
             {/* 5 Compliance Documents Checklist */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black text-[#111111] uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
                   Required Compliance Documents (5/5)
                 </h4>
-                <span className="text-[11px] text-neutral-500">Audit & verification checklist</span>
+                <span className="text-[11px] text-ink-3">Audit & verification checklist</span>
               </div>
 
               {[
@@ -1727,22 +1727,22 @@ export const AdminDashboard: React.FC = () => {
                 return (
                   <div
                     key={docSpec.type}
-                    className="rounded-2xl border border-neutral-200 bg-white p-3.5 shadow-2xs space-y-2 hover:border-neutral-300 transition-all"
+                    className="rounded-card border border-line bg-white p-3.5 space-y-2 hover:border-neutral-300 transition-all"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-neutral-500" />
-                          <h5 className="text-xs font-bold text-[#111111]">{docSpec.title}</h5>
+                          <FileText className="h-4 w-4 text-ink-3" />
+                          <h5 className="text-xs font-bold text-ink">{docSpec.title}</h5>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
                               status === 'approved'
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : status === 'pending'
                                 ? 'bg-amber-100 text-amber-800'
                                 : status === 'rejected'
                                 ? 'bg-red-100 text-red-800'
-                                : 'bg-neutral-100 text-neutral-500'
+                                : 'bg-surface-2 text-ink-3'
                             }`}
                           >
                             {status === 'approved'
@@ -1754,7 +1754,7 @@ export const AdminDashboard: React.FC = () => {
                               : 'Missing'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-neutral-500 mt-0.5">{docSpec.desc}</p>
+                        <p className="text-[11px] text-ink-3 mt-0.5">{docSpec.desc}</p>
                       </div>
 
                       {/* Document Actions */}
@@ -1763,10 +1763,10 @@ export const AdminDashboard: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenDocumentPreview(docData, docSpec.title)}
-                            className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] font-bold text-[#111111] hover:bg-neutral-100 hover:border-neutral-300 transition-colors cursor-pointer"
+                            className="flex items-center gap-1 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-bold text-ink hover:bg-surface-2 hover:border-neutral-300 transition-colors cursor-pointer"
                             title={`Preview ${docSpec.title}`}
                           >
-                            <Eye className="h-3 w-3 text-neutral-600" />
+                            <Eye className="h-3 w-3 text-ink-2" />
                             <span>Preview</span>
                           </button>
                         )}
@@ -1782,7 +1782,7 @@ export const AdminDashboard: React.FC = () => {
                                 'approved'
                               )
                             }
-                            className="flex items-center gap-1 rounded-xl bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 rounded-full bg-success px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
                           >
                             <Check className="h-3 w-3" />
                             <span>Approve</span>
@@ -1802,7 +1802,7 @@ export const AdminDashboard: React.FC = () => {
                                 reason: '',
                               })
                             }
-                            className="flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-danger hover:bg-red-100 transition-colors disabled:opacity-50"
                           >
                             <X className="h-3 w-3" />
                             <span>Reject</span>
@@ -1823,11 +1823,11 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Overall Driver Decision Actions */}
-            <div className="border-t border-neutral-200 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="border-t border-line pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedDriverForReview(null)}
-                className="w-full sm:w-auto rounded-xl border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600 hover:bg-neutral-50 transition-colors"
+                className="w-full sm:w-auto rounded-full border border-line px-4 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2 transition-colors"
               >
                 Close Window
               </button>
@@ -1843,7 +1843,7 @@ export const AdminDashboard: React.FC = () => {
                       reason: '',
                     })
                   }
-                  className="w-full sm:w-auto rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors"
+                  className="w-full sm:w-auto rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-danger hover:bg-red-100 transition-colors"
                 >
                   Reject Application
                 </button>
@@ -1851,7 +1851,7 @@ export const AdminDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleApproveDriver(selectedDriverForReview.userId)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition-colors"
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-full bg-success px-4 py-2 text-xs font-bold text-white shadow-card hover:bg-emerald-700 transition-colors"
                 >
                   <Check className="h-4 w-4" />
                   <span>Approve Driver (Grant Online Access)</span>
@@ -1864,19 +1864,19 @@ export const AdminDashboard: React.FC = () => {
 
       {/* MODAL 2: REJECT DRIVER WITH REASON */}
       {rejectDriverModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-neutral-200 space-y-4">
-            <div className="flex items-center gap-2.5 text-red-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-[20px] bg-white p-6 shadow-modal border border-line space-y-4">
+            <div className="flex items-center gap-2.5 text-danger">
               <ShieldAlert className="h-6 w-6" />
-              <h3 className="text-base font-black text-[#111111]">Reject Driver Application</h3>
+              <h3 className="text-base font-bold text-ink">Reject Driver Application</h3>
             </div>
 
-            <p className="text-xs text-neutral-600 leading-relaxed">
+            <p className="text-xs text-ink-2 leading-relaxed">
               Please specify the compliance reason for rejecting <strong>{rejectDriverModal.driverName}</strong>. This feedback will be sent directly to the driver's notifications and recorded in the audit trail.
             </p>
 
             <div>
-              <label className="block text-[10px] font-bold text-neutral-400 uppercase mb-1">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase mb-1">
                 Rejection Reason (Required)
               </label>
               <textarea
@@ -1886,15 +1886,15 @@ export const AdminDashboard: React.FC = () => {
                   setRejectDriverModal((prev) => (prev ? { ...prev, reason: e.target.value } : null))
                 }
                 placeholder="e.g., Roadworthy inspection expired on 2025-11-01; PrDP certificate image unreadable..."
-                className="w-full rounded-xl border border-neutral-300 p-3 text-xs text-[#111111] focus:border-red-500 focus:outline-none"
+                className="w-full rounded-input border border-neutral-300 p-3 text-xs text-ink focus:border-red-500 focus:outline-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-200">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
               <button
                 type="button"
                 onClick={() => setRejectDriverModal(null)}
-                className="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600 hover:bg-neutral-50"
+                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2"
               >
                 Cancel
               </button>
@@ -1902,7 +1902,7 @@ export const AdminDashboard: React.FC = () => {
                 type="button"
                 disabled={!rejectDriverModal.reason.trim()}
                 onClick={() => handleRejectDriver(rejectDriverModal.driverId, rejectDriverModal.reason)}
-                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700 disabled:opacity-50"
+                className="rounded-full bg-danger px-4 py-2 text-xs font-bold text-white shadow-card hover:bg-red-700 disabled:opacity-50"
               >
                 Confirm Rejection
               </button>
@@ -1913,19 +1913,19 @@ export const AdminDashboard: React.FC = () => {
 
       {/* MODAL 3: REJECT SPECIFIC DOCUMENT WITH REASON */}
       {rejectDocModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-neutral-200 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-[20px] bg-white p-6 shadow-modal border border-line space-y-4">
             <div className="flex items-center gap-2.5 text-amber-700">
               <AlertTriangle className="h-6 w-6" />
-              <h3 className="text-base font-black text-[#111111]">Reject Document: {rejectDocModal.title}</h3>
+              <h3 className="text-base font-bold text-ink">Reject Document: {rejectDocModal.title}</h3>
             </div>
 
-            <p className="text-xs text-neutral-600 leading-relaxed">
+            <p className="text-xs text-ink-2 leading-relaxed">
               Specify what needs correction so the driver can upload an acceptable replacement.
             </p>
 
             <div>
-              <label className="block text-[10px] font-bold text-neutral-400 uppercase mb-1">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase mb-1">
                 Correction Required (Required)
               </label>
               <textarea
@@ -1935,15 +1935,15 @@ export const AdminDashboard: React.FC = () => {
                   setRejectDocModal((prev) => (prev ? { ...prev, reason: e.target.value } : null))
                 }
                 placeholder="e.g., Image is blurry; document corners cut off; name does not match vehicle registration..."
-                className="w-full rounded-xl border border-neutral-300 p-3 text-xs text-[#111111] focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-input border border-neutral-300 p-3 text-xs text-ink focus:border-amber-500 focus:outline-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-200">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
               <button
                 type="button"
                 onClick={() => setRejectDocModal(null)}
-                className="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600 hover:bg-neutral-50 cursor-pointer"
+                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2 cursor-pointer"
               >
                 Cancel
               </button>
@@ -1958,7 +1958,7 @@ export const AdminDashboard: React.FC = () => {
                     rejectDocModal.reason
                   )
                 }
-                className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+                className="rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-card hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
               >
                 {isUpdatingDoc ? 'Updating...' : 'Reject Document'}
               </button>
@@ -1978,29 +1978,29 @@ export const AdminDashboard: React.FC = () => {
               setPreviewDocError(null);
             }
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-5"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-5"
         >
-          <div className="relative flex flex-col w-full max-w-4xl max-h-[92vh] overflow-hidden rounded-3xl bg-white shadow-2xl border border-neutral-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative flex flex-col w-full max-w-4xl max-h-[92vh] overflow-hidden rounded-[20px] bg-white shadow-modal border border-line animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 bg-neutral-50/80">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-neutral-50/80">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="rounded-xl bg-[#111111] p-2 text-[#FFC107] shrink-0">
+                <div className="rounded-xl bg-ink p-2 text-white shrink-0">
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="truncate">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm sm:text-base font-black text-[#111111] truncate">
+                    <h3 className="text-sm sm:text-base font-bold text-ink truncate">
                       {previewDocModal.title}
                     </h3>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase shrink-0 ${
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase shrink-0 ${
                         previewDocModal.doc.status === 'approved'
                           ? 'bg-emerald-100 text-emerald-800'
                           : previewDocModal.doc.status === 'pending'
                           ? 'bg-amber-100 text-amber-800'
                           : previewDocModal.doc.status === 'rejected'
                           ? 'bg-red-100 text-red-800'
-                          : 'bg-neutral-100 text-neutral-500'
+                          : 'bg-surface-2 text-ink-3'
                       }`}
                     >
                       {previewDocModal.doc.status === 'approved'
@@ -2012,10 +2012,10 @@ export const AdminDashboard: React.FC = () => {
                         : 'Uploaded'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-neutral-500 truncate mt-0.5">
-                    Driver: <span className="font-bold text-neutral-700">{previewDocModal.driverName}</span>
+                  <p className="text-[11px] text-ink-3 truncate mt-0.5">
+                    Driver: <span className="font-bold text-ink-2">{previewDocModal.driverName}</span>
                     {previewDocModal.doc.fileName ? (
-                      <> • File: <span className="font-mono text-neutral-600">{previewDocModal.doc.fileName}</span></>
+                      <> • File: <span className="font-mono text-ink-2">{previewDocModal.doc.fileName}</span></>
                     ) : null}
                     {previewDocModal.doc.fileSizeBytes ? (
                       <> • {(previewDocModal.doc.fileSizeBytes / 1024).toFixed(1)} KB</>
@@ -2031,7 +2031,7 @@ export const AdminDashboard: React.FC = () => {
                     setPreviewDocModal(null);
                     setPreviewDocError(null);
                   }}
-                  className="rounded-full p-2 text-neutral-500 hover:bg-neutral-200 transition-colors cursor-pointer"
+                  className="rounded-full p-2 text-ink-3 hover:bg-neutral-200 transition-colors cursor-pointer"
                   title="Close preview (Esc)"
                 >
                   <X className="h-5 w-5" />
@@ -2043,21 +2043,21 @@ export const AdminDashboard: React.FC = () => {
             <div className="relative flex-1 overflow-auto p-4 sm:p-6 bg-neutral-100/50 flex flex-col items-center justify-center min-h-[380px]">
               {previewDocLoading && !resolvedDocData ? (
                 <div className="flex flex-col items-center justify-center p-12 space-y-3">
-                  <RefreshCw className="h-8 w-8 animate-spin text-[#FF7A00]" />
-                  <p className="text-xs font-bold text-neutral-600">Retrieving compliance document...</p>
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary-text" />
+                  <p className="text-xs font-bold text-ink-2">Retrieving compliance document...</p>
                 </div>
               ) : previewDocError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-6 max-w-md w-full text-center space-y-3 shadow-xs">
-                  <AlertTriangle className="h-10 w-10 text-red-600 mx-auto" />
+                <div className="rounded-card border border-red-200 bg-red-50 p-6 max-w-md w-full text-center space-y-3 ">
+                  <AlertTriangle className="h-10 w-10 text-danger mx-auto" />
                   <h4 className="text-sm font-bold text-red-900">Unable to load this document</h4>
-                  <p className="text-xs text-red-700 leading-relaxed">
+                  <p className="text-xs text-danger leading-relaxed">
                     {previewDocError}
                   </p>
                   <div className="flex items-center justify-center gap-2 pt-2">
                     <button
                       type="button"
                       onClick={handleRetryDocumentPreview}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3.5 py-2 text-xs font-bold text-danger hover:bg-red-100 transition-colors cursor-pointer"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       <span>Retry</span>
@@ -2067,9 +2067,9 @@ export const AdminDashboard: React.FC = () => {
                         href={resolvedDocData.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#111111] px-3.5 py-2 text-xs font-bold text-white hover:bg-neutral-800 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-3.5 py-2 text-xs font-bold text-white hover:bg-ink transition-colors"
                       >
-                        <ExternalLink className="h-3.5 w-3.5 text-[#FFC107]" />
+                        <ExternalLink className="h-3.5 w-3.5 text-primary-text" />
                         <span>Open in New Tab</span>
                       </a>
                     )}
@@ -2080,26 +2080,26 @@ export const AdminDashboard: React.FC = () => {
                   <object
                     data={resolvedDocData.url}
                     type="application/pdf"
-                    className="w-full h-[62vh] rounded-2xl border border-neutral-300 bg-white shadow-xs"
+                    className="w-full h-[62vh] rounded-card border border-neutral-300 bg-white "
                   >
                     <iframe
                       src={resolvedDocData.url}
                       title={previewDocModal.title}
-                      className="w-full h-[62vh] rounded-2xl border border-neutral-300 bg-white shadow-xs"
+                      className="w-full h-[62vh] rounded-card border border-neutral-300 bg-white "
                       onError={() => {
                         setPreviewDocError('The PDF document could not be embedded directly. You can open it in a separate tab or download it.');
                       }}
                     >
                       <div className="p-8 text-center space-y-3">
                         <FileText className="h-12 w-12 text-neutral-400 mx-auto" />
-                        <p className="text-xs font-bold text-neutral-700">PDF preview is not supported directly in this frame.</p>
+                        <p className="text-xs font-bold text-ink-2">PDF preview is not supported directly in this frame.</p>
                         <a
                           href={resolvedDocData.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#111111] px-3.5 py-2 text-xs font-bold text-white hover:bg-neutral-800 transition-colors"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-3.5 py-2 text-xs font-bold text-white hover:bg-ink transition-colors"
                         >
-                          <ExternalLink className="h-3.5 w-3.5 text-[#FFC107]" />
+                          <ExternalLink className="h-3.5 w-3.5 text-primary-text" />
                           <span>Open PDF in New Tab</span>
                         </a>
                       </div>
@@ -2107,11 +2107,11 @@ export const AdminDashboard: React.FC = () => {
                   </object>
                 </div>
               ) : resolvedDocData ? (
-                <div className="relative flex items-center justify-center w-full max-h-[66vh] overflow-auto rounded-2xl bg-neutral-900/5 p-2 sm:p-4 border border-neutral-200/60">
+                <div className="relative flex items-center justify-center w-full max-h-[66vh] overflow-auto rounded-card bg-neutral-900/5 p-2 sm:p-4 border border-neutral-200/60">
                   <img
                     src={resolvedDocData.url}
                     alt={previewDocModal.title}
-                    className="max-h-[62vh] max-w-full rounded-xl object-contain shadow-sm transition-all"
+                    className="max-h-[62vh] max-w-full rounded-xl object-contain shadow-card transition-all"
                     onLoad={() => setPreviewDocLoading(false)}
                     onError={() => {
                       setPreviewDocLoading(false);
@@ -2123,7 +2123,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Modal Footer with Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-200 px-5 py-3.5 bg-white">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-line px-5 py-3.5 bg-white">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 {resolvedDocData?.url && (
                   <>
@@ -2131,17 +2131,17 @@ export const AdminDashboard: React.FC = () => {
                       href={resolvedDocData.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-100 hover:text-[#111111] transition-colors"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                     >
-                      <ExternalLink className="h-3.5 w-3.5 text-neutral-500" />
+                      <ExternalLink className="h-3.5 w-3.5 text-ink-3" />
                       <span>Open in New Tab</span>
                     </a>
                     <a
                       href={resolvedDocData.url}
                       download={resolvedDocData.fileName || previewDocModal.doc.fileName || 'compliance_document'}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-100 hover:text-[#111111] transition-colors"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                     >
-                      <Download className="h-3.5 w-3.5 text-neutral-500" />
+                      <Download className="h-3.5 w-3.5 text-ink-3" />
                       <span>Download</span>
                     </a>
                   </>
@@ -2163,7 +2163,7 @@ export const AdminDashboard: React.FC = () => {
                         prev ? { ...prev, doc: { ...prev.doc, status: 'approved' } } : null
                       );
                     }}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition-colors disabled:opacity-50 cursor-pointer"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-full bg-success px-4 py-2 text-xs font-bold text-white shadow-card hover:bg-emerald-700 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     <Check className="h-3.5 w-3.5" />
                     <span>Approve Document</span>
@@ -2186,7 +2186,7 @@ export const AdminDashboard: React.FC = () => {
                         reason: '',
                       });
                     }}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50 cursor-pointer"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-danger hover:bg-red-100 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
                     <span>Reject Document</span>
@@ -2200,7 +2200,7 @@ export const AdminDashboard: React.FC = () => {
                     setPreviewDocError(null);
                     setResolvedDocData(null);
                   }}
-                  className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer"
+                  className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2 transition-colors cursor-pointer"
                 >
                   Close
                 </button>

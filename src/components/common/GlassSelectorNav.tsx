@@ -73,13 +73,13 @@ export const GlassSelectorNav: React.FC<GlassSelectorNavProps> = ({
       {/* Translucent Frosted Glass Outer Container */}
       <div
         role="tablist"
-        className="pointer-events-auto relative flex w-full max-w-sm sm:max-w-md md:max-w-lg items-center justify-between rounded-[32px] p-1.5 bg-white/80 backdrop-blur-2xl border border-white/70 shadow-[0_12px_36px_rgba(0,0,0,0.08),0_2px_12px_rgba(0,0,0,0.04)] transition-all"
+        className="pointer-events-auto relative flex w-full max-w-sm sm:max-w-md md:max-w-lg items-center justify-between rounded-full p-1.5 bg-white shadow-raised transition-all"
         style={{
           WebkitBackdropFilter: 'blur(24px)',
         }}
       >
         {/* Subtle Top-Edge Glass Reflection */}
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/90 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-[1px] bg-transparent" />
 
         {items.map((item) => {
           const Icon = item.icon;
@@ -92,13 +92,13 @@ export const GlassSelectorNav: React.FC<GlassSelectorNavProps> = ({
               aria-selected={isActive}
               aria-label={item.ariaLabel || item.label}
               onClick={() => handleSelect(item.id)}
-              className="relative flex-1 min-w-0 flex flex-col items-center justify-center py-1.5 px-1 sm:px-3 rounded-[26px] min-h-[46px] cursor-pointer select-none transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A00] active:scale-[0.96]"
+              className="relative flex-1 min-w-0 flex flex-col items-center justify-center py-1.5 px-1 sm:px-3 rounded-full min-h-[48px] cursor-pointer select-none transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.96]"
             >
               {/* Floating Glass Capsule/Pill (Animated behind content) */}
               {isActive && (
                 <motion.div
                   layoutId={shouldReduceMotion ? undefined : layoutId}
-                  className="absolute inset-0 rounded-[26px] bg-white/95 backdrop-blur-2xl border border-white/90 shadow-[0_4px_16px_rgba(0,0,0,0.07),0_2px_8px_rgba(255,122,0,0.12)] ring-1 ring-[#FF7A00]/20 z-0"
+                  className="absolute inset-0 rounded-full bg-primary-50 z-0"
                   transition={
                     shouldReduceMotion
                       ? { duration: 0 }
@@ -120,21 +120,21 @@ export const GlassSelectorNav: React.FC<GlassSelectorNavProps> = ({
                   <Icon
                     className={`h-4.5 w-4.5 sm:h-5 sm:w-5 transition-all duration-200 ${
                       isActive
-                        ? 'text-[#FF7A00] stroke-[2.4] scale-105'
-                        : 'text-neutral-500 stroke-[2] group-hover:text-neutral-800'
+                        ? 'text-primary-text stroke-[2.4] scale-105'
+                        : 'text-ink-3 stroke-[2] group-hover:text-ink'
                     }`}
                   />
                   {/* Badge (e.g. unread count) */}
                   {item.badge !== undefined && Number(item.badge) > 0 && (
-                    <span className="absolute -top-1 -right-2 sm:-right-2.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#FF7A00] px-1 text-[9px] font-black text-white shadow-xs">
+                    <span className="absolute -top-1 -right-2 sm:-right-2.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-on-primary shadow-card">
                       {item.badge}
                     </span>
                   )}
                 </div>
 
                 <span
-                  className={`text-[10px] sm:text-[11px] font-bold tracking-tight truncate max-w-full leading-tight transition-colors duration-200 ${
-                    isActive ? 'text-[#FF7A00] font-extrabold' : 'text-neutral-500'
+                  className={`text-[11px] sm:text-[11px] font-bold tracking-tight truncate max-w-full leading-tight transition-colors duration-200 ${
+                    isActive ? 'text-primary-text font-bold' : 'text-ink-3'
                   }`}
                 >
                   {item.label}
@@ -178,7 +178,7 @@ export const InlineGlassSegmentedControl: React.FC<InlineGlassSegmentedControlPr
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`relative flex items-center rounded-[28px] p-1 bg-white/80 backdrop-blur-xl border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.05),0_1px_4px_rgba(0,0,0,0.03)] ${className}`}
+      className={`relative flex items-center rounded-full p-1 bg-surface-2 ${className}`}
       style={{
         WebkitBackdropFilter: 'blur(20px)',
       }}
@@ -194,13 +194,13 @@ export const InlineGlassSegmentedControl: React.FC<InlineGlassSegmentedControlPr
             aria-selected={isActive}
             aria-label={item.label}
             onClick={() => onChange(item.id)}
-            className="relative flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-[24px] min-h-[44px] cursor-pointer select-none transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A00] active:scale-[0.97]"
+            className="relative flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-full min-h-[44px] cursor-pointer select-none transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.97]"
           >
             {/* Floating Glass Pill */}
             {isActive && (
               <motion.div
                 layoutId={shouldReduceMotion ? undefined : layoutId}
-                className="absolute inset-0 rounded-[24px] bg-white backdrop-blur-2xl border border-white/95 shadow-[0_3px_14px_rgba(0,0,0,0.06),0_2px_6px_rgba(255,122,0,0.12)] ring-1 ring-[#FF7A00]/20 z-0"
+                className="absolute inset-0 rounded-full bg-white shadow-card z-0"
                 transition={
                   shouldReduceMotion
                     ? { duration: 0 }
@@ -218,19 +218,19 @@ export const InlineGlassSegmentedControl: React.FC<InlineGlassSegmentedControlPr
               {Icon && (
                 <Icon
                   className={`h-4 w-4 shrink-0 transition-colors duration-200 ${
-                    isActive ? 'text-[#FF7A00] stroke-[2.4]' : 'text-neutral-500 stroke-[2]'
+                    isActive ? 'text-primary-text stroke-[2.4]' : 'text-ink-3 stroke-[2]'
                   }`}
                 />
               )}
               <span
                 className={`text-xs sm:text-xs font-bold truncate transition-colors duration-200 ${
-                  isActive ? 'text-[#FF7A00] font-extrabold' : 'text-neutral-600'
+                  isActive ? 'text-primary-text font-bold' : 'text-ink-2'
                 }`}
               >
                 {item.label}
               </span>
               {item.badge !== undefined && Number(item.badge) > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF7A00] px-1 text-[10px] font-black text-white shadow-xs">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-on-primary shadow-card">
                   {item.badge}
                 </span>
               )}

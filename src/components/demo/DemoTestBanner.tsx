@@ -70,13 +70,13 @@ export const DemoTestBanner: React.FC = () => {
   };
 
   return (
-    <div id="demo-test-mode-banner-container" className="w-full shrink-0 z-40 bg-[#111111] text-white select-none">
+    <div id="demo-test-mode-banner-container" className="w-full shrink-0 z-40 bg-ink text-white select-none">
       {/* Top Banner Bar */}
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-6">
         {/* Left: Indicator & Current Persona View */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-[10px] sm:text-xs font-black text-[#FFC107] uppercase tracking-wider shrink-0">
-            <span className="flex h-2 w-2 rounded-full bg-[#FFC107] animate-pulse" />
+          <div className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-primary uppercase tracking-wider shrink-0">
+            <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
             <span>DEMO TEST MODE</span>
           </div>
 
@@ -101,10 +101,10 @@ export const DemoTestBanner: React.FC = () => {
             type="button"
             onClick={handleSwitchPersona}
             disabled={isSwitching || loading}
-            className={`flex items-center gap-1.5 rounded-xl px-2.5 sm:px-3.5 py-1.5 text-xs font-black transition-all active:scale-95 shadow-xs ${
+            className={`flex items-center gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1.5 text-xs font-bold transition-all active:scale-95 shadow-card ${
               isRiderView
-                ? 'bg-emerald-500 text-neutral-950 hover:bg-emerald-400'
-                : 'bg-[#FFC107] text-neutral-950 hover:bg-[#FFB300]'
+                ? 'bg-success text-neutral-950 hover:bg-emerald-400'
+                : 'bg-primary text-neutral-950 hover:bg-primary-hover active:bg-primary-pressed'
             } disabled:opacity-50`}
             title={`Switch to ${isRiderView ? 'Driver Sipho' : 'Rider Amara'}`}
           >
@@ -124,10 +124,10 @@ export const DemoTestBanner: React.FC = () => {
             type="button"
             onClick={handleResetRide}
             disabled={isResetting || isSwitching}
-            className="flex items-center gap-1 rounded-xl border border-neutral-700 bg-neutral-800/90 px-2 sm:px-2.5 py-1.5 text-xs font-bold text-neutral-200 hover:bg-neutral-700 hover:text-white transition-colors active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-1 rounded-full border border-neutral-700 bg-neutral-800/90 px-2 sm:px-2.5 py-1.5 text-xs font-bold text-neutral-200 hover:bg-neutral-700 hover:text-white transition-colors active:scale-95 disabled:opacity-50"
             title="Reset demo test ride to start a fresh ride"
           >
-            <RotateCcw className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isResetting ? 'animate-spin text-[#FFC107]' : ''}`} />
+            <RotateCcw className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isResetting ? 'animate-spin text-primary' : ''}`} />
             <span className="hidden md:inline">Reset Demo Ride</span>
           </button>
 
@@ -136,14 +136,14 @@ export const DemoTestBanner: React.FC = () => {
             id="btn-demo-toggle-status"
             type="button"
             onClick={() => setShowStatusPanel((prev) => !prev)}
-            className={`flex items-center gap-1 rounded-xl border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition-colors active:scale-95 ${
+            className={`flex items-center gap-1 rounded-full border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition-colors active:scale-95 ${
               showStatusPanel
-                ? 'border-amber-400/50 bg-amber-500/20 text-[#FFC107]'
+                ? 'border-amber-400/50 bg-amber-500/20 text-primary'
                 : 'border-neutral-700 bg-neutral-800/90 text-neutral-300 hover:bg-neutral-700'
             }`}
             title="Toggle real-time Firestore ride & payment telemetry"
           >
-            <Activity className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#FFC107]" />
+            <Activity className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
             <span className="hidden lg:inline">Live Telemetry</span>
             {showStatusPanel ? (
               <ChevronUp className="h-3 w-3" />
@@ -157,7 +157,7 @@ export const DemoTestBanner: React.FC = () => {
             id="btn-demo-exit"
             type="button"
             onClick={exitDemoTestMode}
-            className="flex items-center gap-1 rounded-xl border border-neutral-700 bg-neutral-800/60 p-1.5 sm:px-2 text-xs font-medium text-neutral-400 hover:bg-red-950/40 hover:border-red-600/60 hover:text-red-300 transition-colors"
+            className="flex items-center gap-1 rounded-full border border-neutral-700 bg-neutral-800/60 p-1.5 sm:px-2 text-xs font-medium text-neutral-400 hover:bg-red-950/40 hover:border-red-600/60 hover:text-red-300 transition-colors"
             title="Exit Demo Test Mode"
           >
             <LogOut className="h-3.5 w-3.5" />

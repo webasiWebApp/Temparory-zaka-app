@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  * ZAKA E-Hailing Platform - Clean White iPhone-Style Wallet & Payment Modal
- * Visuals: Clean white surfaces, soft shadows, rounded-3xl cards, circular buttons, ZAKA orange accent
+ * Visuals: Clean white surfaces, soft shadows, rounded-card cards, circular buttons, ZAKA orange accent
  *
  * The balance and the transaction list are read live from Firestore. The balance itself is only ever
  * changed by the backend: credited when Peach Payments confirms a top-up, debited when a wallet ride is settled.
@@ -144,20 +144,20 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="flex w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-neutral-100 max-h-[90dvh] sm:max-h-[calc(100dvh-9rem)] overflow-y-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-7 cursor-default"
+        className="flex w-full max-w-lg flex-col rounded-t-sheet sm:rounded-[20px] bg-white p-5 sm:p-7 shadow-modal border border-line max-h-[90dvh] sm:max-h-[calc(100dvh-9rem)] overflow-y-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-7 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+        <div className="flex items-center justify-between pb-4 border-b border-line">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF3E0] text-[#FF7A00]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-50 text-primary-text">
               <Wallet className="h-5 w-5 stroke-[2.4]" />
             </div>
             <div>
-              <h2 id="wallet-modal-title" className="text-lg font-extrabold text-neutral-900 tracking-tight">
+              <h2 id="wallet-modal-title" className="text-lg font-bold text-ink tracking-tight">
                 ZAKA Wallet & Pay
               </h2>
-              <p className="text-xs text-neutral-500 font-medium">Manage payment methods & credits</p>
+              <p className="text-xs text-ink-3 font-medium">Manage payment methods & credits</p>
             </div>
           </div>
 
@@ -166,20 +166,20 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
             id="btn-close-wallet"
             onClick={onClose}
             aria-label="Close wallet"
-            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-neutral-100 text-neutral-600 hover:bg-neutral-200 active:scale-95 transition-all cursor-pointer"
+            className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-surface-2 text-ink-2 hover:bg-neutral-200 active:scale-95 transition-all cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Balance Card */}
-        <div className="mt-5 rounded-[28px] bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 p-6 text-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] relative overflow-hidden">
-          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 rounded-full bg-[#FF7A00]/20 blur-2xl pointer-events-none" />
+        <div className="mt-5 rounded-card bg-ink p-6 text-white shadow-modal relative overflow-hidden">
+          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 rounded-full bg-primary-100 blur-2xl pointer-events-none" />
           <div className="relative z-10">
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-300">
               ZAKA Wallet Balance
             </span>
-            <div id="wallet-balance-amount" className="mt-2 text-3xl font-black tracking-tight text-white">
+            <div id="wallet-balance-amount" className="mt-2 text-3xl font-bold tracking-tight text-white">
               {fareService.formatZAR(walletBalance)}
             </div>
             <p className="mt-1 text-xs text-neutral-400">Available for rides across South Africa</p>
@@ -208,9 +208,9 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
 
         {notice && (
           <div
-            className={`mt-3 flex items-start gap-2 rounded-2xl border p-3 text-xs font-bold ${
+            className={`mt-3 flex items-start gap-2 rounded-card border p-3 text-xs font-bold ${
               notice.tone === 'error'
-                ? 'border-red-200 bg-red-50 text-red-700'
+                ? 'border-red-200 bg-red-50 text-danger'
                 : notice.tone === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : 'border-amber-200 bg-amber-50 text-amber-900'
@@ -223,7 +223,7 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
 
         {/* Payment Methods Selection */}
         <div className="mt-6 space-y-3">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-neutral-500">
+          <span className="text-xs font-bold uppercase tracking-wider text-ink-3">
             Default Payment Method
           </span>
 
@@ -235,28 +235,28 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
                 type="button"
                 disabled={m.disabled}
                 onClick={() => selectMethod(m.id)}
-                className={`flex w-full items-center justify-between rounded-[24px] p-4 text-left transition-all border ${
+                className={`flex w-full items-center justify-between rounded-card p-4 text-left transition-all border ${
                   active
-                    ? 'border-[#FF7A00] bg-[#FFF8E1]/30 shadow-[0_4px_16px_rgba(255,122,0,0.08)]'
-                    : 'border-neutral-200 bg-neutral-50/70 hover:bg-white hover:border-neutral-300'
+                    ? 'border-primary bg-primary-50/30 '
+                    : 'border-line bg-neutral-50/70 hover:bg-white hover:border-neutral-300'
                 } ${m.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
                 <div className="flex items-center gap-3.5">
                   <div
                     className={`flex h-11 w-11 items-center justify-center rounded-full ${
-                      active ? 'bg-[#FF7A00] text-white' : 'bg-neutral-200 text-neutral-700'
+                      active ? 'bg-primary text-on-primary' : 'bg-neutral-200 text-ink-2'
                     }`}
                   >
                     {m.icon}
                   </div>
                   <div>
-                    <h4 className="text-sm font-extrabold text-neutral-900">{m.title}</h4>
-                    <p className="text-xs text-neutral-500 font-medium">{m.subtitle}</p>
+                    <h4 className="text-sm font-bold text-ink">{m.title}</h4>
+                    <p className="text-xs text-ink-3 font-medium">{m.subtitle}</p>
                   </div>
                 </div>
                 <div
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                    active ? 'border-[#FF7A00] bg-[#FF7A00] text-white' : 'border-neutral-300'
+                    active ? 'border-primary bg-primary text-on-primary' : 'border-neutral-300'
                   }`}
                 >
                   {active && <CheckCircle2 className="h-4 w-4" />}
@@ -268,15 +268,15 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
 
         {/* Wallet Activity */}
         <div className="mt-6">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-neutral-500">
+          <span className="text-xs font-bold uppercase tracking-wider text-ink-3">
             Wallet Activity
           </span>
           {transactions.length === 0 ? (
-            <p className="mt-2 rounded-[24px] border border-neutral-200 bg-neutral-50/70 p-4 text-xs font-medium text-neutral-500">
+            <p className="mt-2 rounded-card border border-line bg-neutral-50/70 p-4 text-xs font-medium text-ink-3">
               No wallet activity yet. Top-ups and wallet ride payments will appear here.
             </p>
           ) : (
-            <ul className="mt-2 divide-y divide-neutral-100 rounded-[24px] border border-neutral-200 bg-white">
+            <ul className="mt-2 divide-y divide-line rounded-card border border-line bg-white">
               {transactions.slice(0, 20).map((tx) => {
                 const credit = tx.direction === 'credit';
                 const pending = tx.status !== 'completed';
@@ -288,8 +288,8 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
                           pending
                             ? 'bg-amber-50 text-amber-600'
                             : credit
-                              ? 'bg-emerald-50 text-emerald-600'
-                              : 'bg-neutral-100 text-neutral-700'
+                              ? 'bg-emerald-50 text-success'
+                              : 'bg-surface-2 text-ink-2'
                         }`}
                       >
                         {pending ? (
@@ -301,18 +301,18 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-extrabold text-neutral-900">
+                        <p className="truncate text-xs font-bold text-ink">
                           {tx.description || (tx.type === 'topup' ? 'Wallet top-up' : 'Ride payment')}
                         </p>
-                        <p className="text-[11px] font-medium text-neutral-500">
+                        <p className="text-[11px] font-medium text-ink-3">
                           {new Date(tx.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                           {pending ? ' • Awaiting confirmation' : ''}
                         </p>
                       </div>
                     </div>
                     <span
-                      className={`shrink-0 text-xs font-black ${
-                        pending ? 'text-neutral-400' : credit ? 'text-emerald-600' : 'text-neutral-900'
+                      className={`shrink-0 text-xs font-bold ${
+                        pending ? 'text-neutral-400' : credit ? 'text-success' : 'text-ink'
                       }`}
                     >
                       {credit ? '+' : '−'}
@@ -326,8 +326,8 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
         </div>
 
         {/* Security Note */}
-        <div className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-neutral-500 font-medium">
-          <ShieldCheck className="h-4 w-4 text-emerald-600" />
+        <div className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-ink-3 font-medium">
+          <ShieldCheck className="h-4 w-4 text-success" />
           <span>Card details are handled by Peach Payments and never stored by ZAKA</span>
         </div>
 
@@ -335,7 +335,7 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
         <button
           id="btn-wallet-done"
           onClick={onClose}
-          className="mt-6 w-full rounded-full py-3.5 bg-[#FF7A00] text-white font-extrabold text-sm shadow-[0_8px_24px_rgba(255,122,0,0.25)] hover:bg-[#F57C00] active:scale-[0.98] transition-all min-h-[48px] cursor-pointer"
+          className="mt-6 w-full rounded-full py-3.5 bg-primary text-on-primary font-bold text-sm hover:bg-[#F57C00] active:scale-[0.98] transition-all min-h-[48px] cursor-pointer"
         >
           Save & Done
         </button>
