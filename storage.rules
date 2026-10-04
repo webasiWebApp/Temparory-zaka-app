@@ -13,7 +13,10 @@ service firebase.storage {
     function isRealAdmin() {
       return isAuthenticated() && (
         request.auth.token.get('role', '') == 'admin' ||
-        request.auth.token.get('email', '') in ['admin@zaka.io', 'zaka.backend.service@zaka.io', 'ian.mkhize@gmail.com'] ||
+        (
+          request.auth.token.get('email_verified', false) == true &&
+          request.auth.token.get('email', '') in ['admin@zaka.io', 'zaka.backend.service@zaka.io', 'webasiinfo@gmail.com']
+        ) ||
         request.auth.uid in ['Js6QAJWZskfRhInQFlX4fjlZ9Ws1', 'KCKA8mq7u6Udj5Lp4pIMSqlEgPJ2']
       );
     }

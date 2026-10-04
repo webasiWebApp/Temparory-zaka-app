@@ -19,6 +19,7 @@ import {
   orderBy,
   limit,
   runTransaction,
+  writeBatch,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -46,7 +47,9 @@ import {
   PricingConfig,
   AdminAuditRecord,
   UserRole,
+  WalletTransaction,
 } from '../types';
+import { apiJson } from '../services/apiClient';
 import { ZAKA_DEFAULT_LAUNCH_PRICING, fareService } from '../services/fareService';
 
 /**
@@ -141,6 +144,19 @@ export const VEHICLE_CONFIGS: Record<VehicleType, {
   },
 };
 
+/** Cryptographically random 4-digit Safety PIN (1000-9999) */
+function generateSafetyPin(): string {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return String(1000 + (buf[0] % 9000));
+}
+
+/** Platform split: 15% ZAKA commission, 85% driver earnings (rounded to cents) */
+function splitFare(amount: number): { platformFee: number; driverEarnings: number } {
+  const platformFee = Math.round(amount * 15) / 100;
+  return { platformFee, driverEarnings: Math.round((amount - platformFee) * 100) / 100 };
+}
+
 export const firestoreService = {
   // ================= USERS & AUTH PROFILES =================
 
@@ -148,34 +164,34 @@ export const firestoreService = {
    * Checks whether a canonical normalized phone number is already registered in the system
    * across users, passengers, drivers, and phoneIndex collections.
    */
-  async checkPhoneRegistered(normalizedPhone: string): Promise<{ isRegistered: boolean; uid?: string }> {
+  async checkPhoneRegistered(normalizedPhone: string): Promise<{ isRegistered: boolean; uid?: string; isOwn?: boolean }> {
     if (!normalizedPhone) return { isRegistered: false };
+    const myUid = auth.currentUser?.uid;
 
-    // 1. Check server-side endpoint (which checks phoneIndex, users, passengers, and drivers with admin privileges)
-    try {
-      const res = await fetch(`/api/auth/check-phone?phone=${encodeURIComponent(normalizedPhone)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && typeof data.isRegistered === 'boolean') {
-          return { isRegistered: data.isRegistered, uid: data.uid };
+    // 1. Once signed in, the phone index answers authoritatively (and tells us if the number is our own)
+    if (myUid) {
+      try {
+        const snap = await getDoc(doc(db, 'phoneIndex', normalizedPhone));
+        if (snap.exists() && snap.data()?.uid) {
+          const owner = snap.data().uid as string;
+          return { isRegistered: true, uid: owner, isOwn: owner === myUid };
         }
+      } catch (err: any) {
+        console.warn('Note checking phone registered in phoneIndex:', err);
+      }
+    }
+
+    // 2. Server-side check (works before sign-in; also covers accounts created before the index existed)
+    try {
+      const { ok, data } = await apiJson<{ isRegistered?: boolean; ownedByCaller?: boolean }>(
+        `/api/auth/check-phone?phone=${encodeURIComponent(normalizedPhone)}`,
+        { timeoutMs: 10000 }
+      );
+      if (ok && typeof data?.isRegistered === 'boolean') {
+        return { isRegistered: data.isRegistered, isOwn: Boolean(data.ownedByCaller), uid: data.ownedByCaller ? myUid : undefined };
       }
     } catch (netErr) {
       console.warn('Note checking phone registered via backend API:', netErr);
-    }
-
-    // 2. Direct client-side phoneIndex check as fallback
-    try {
-      const pRef = doc(db, 'phoneIndex', normalizedPhone);
-      const snap = await getDoc(pRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data?.uid) {
-          return { isRegistered: true, uid: data.uid };
-        }
-      }
-    } catch (err: any) {
-      console.warn('Note checking phone registered in phoneIndex:', err);
     }
 
     return { isRegistered: false };
@@ -207,11 +223,50 @@ export const firestoreService = {
         }, { merge: true });
       });
     } catch (err: any) {
-      if (err?.message && (err.message.includes('already registered') || err.message.includes('already registered with ZAKA'))) {
+      if (err?.message && err.message.includes('already registered')) {
         throw err;
+      }
+      // The security rules refuse to overwrite a number owned by another account
+      if (err?.code === 'permission-denied') {
+        throw new Error('This phone number is already registered. Please sign in instead.');
       }
       console.warn('phoneIndex claim transaction note (proceeding):', err);
     }
+  },
+
+  /**
+   * Frees a previously reserved number (only the owning account is allowed to).
+   */
+  async releasePhoneIndex(normalizedPhone: string, uid: string): Promise<void> {
+    if (!normalizedPhone || !uid) return;
+    try {
+      const phoneRef = doc(db, 'phoneIndex', normalizedPhone);
+      const snap = await getDoc(phoneRef);
+      if (snap.exists() && snap.data()?.uid === uid) {
+        await deleteDoc(phoneRef);
+      }
+    } catch (err) {
+      console.warn('phoneIndex release note:', err);
+    }
+  },
+
+  /**
+   * Partial profile updates: only the supplied fields are written, so server-owned fields
+   * (wallet balance, approval status, ratings, earnings) can never be overwritten with stale values.
+   */
+  async updatePassengerFields(userId: string, changes: Partial<PassengerProfile>): Promise<void> {
+    await setDoc(
+      doc(db, 'passengers', userId),
+      removeUndefinedFields({ ...changes, updatedAt: new Date().toISOString() }),
+      { merge: true }
+    );
+  },
+
+  async updateDriverFields(userId: string, changes: Partial<DriverProfile>): Promise<void> {
+    await updateDoc(
+      doc(db, 'drivers', userId),
+      removeUndefinedFields({ ...changes, updatedAt: new Date().toISOString() })
+    );
   },
 
   async createUserProfile(user: UserProfile): Promise<void> {
@@ -347,6 +402,11 @@ export const firestoreService = {
     }, { merge: true });
   },
 
+  /**
+   * Returns null ONLY when the profile genuinely does not exist.
+   * Read failures (offline, timeout, permission) are thrown: treating them as "no profile" would let
+   * callers re-create the account as a Rider and overwrite a Driver's role.
+   */
   async getUserProfile(uid: string): Promise<UserProfile | null> {
     try {
       const userRef = doc(db, 'users', uid);
@@ -358,7 +418,7 @@ export const firestoreService = {
         handleFirestoreError(e, OperationType.GET, `users/${uid}`);
       }
       console.warn('Notice reading user profile from Firestore:', e);
-      return null;
+      throw e;
     }
   },
 
@@ -382,26 +442,47 @@ export const firestoreService = {
    * Note: Completed ride transactions and payments remain intact with pseudonymized user references for statutory financial compliance.
    */
   async deleteOrAnonymizeUserProfile(uid: string): Promise<void> {
-    try {
-      const userRef = doc(db, 'users', uid);
-      const passengerRef = doc(db, 'passengers', uid);
+    // 1. Backend erasure: notifications, recent destinations, phone reservation, driver documents and
+    //    files, and identifying details on historic rides.
+    let erasedByServer = false;
+    const { ok, status, data } = await apiJson<{ success?: boolean; error?: string }>('/api/user/delete-data', {
+      method: 'POST',
+      json: {},
+      timeoutMs: 60000,
+    }).catch(() => ({ ok: false, status: 0, data: {} as { success?: boolean; error?: string } }));
+    if (ok && data?.success) {
+      erasedByServer = true;
+    } else if (status === 409) {
+      throw new Error(data?.error || 'You have a ride in progress. Please complete or cancel it first.');
+    }
 
-      // Delete the passenger profile document
+    // 2. Fallback when the backend is unreachable: remove everything this account is allowed to remove itself
+    if (!erasedByServer) {
       try {
-        await deleteDoc(passengerRef);
+        const recent = await getDocs(collection(db, 'users', uid, 'recentDestinations'));
+        await Promise.all(recent.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+      } catch (err) {
+        console.warn('Note deleting recent destinations:', err);
+      }
+      try {
+        const notes = await getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)));
+        await Promise.all(notes.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+      } catch (err) {
+        console.warn('Note deleting notifications:', err);
+      }
+      try {
+        const userSnap = await getDoc(doc(db, 'users', uid));
+        const phone = userSnap.exists() ? (userSnap.data() as UserProfile).phone : '';
+        if (phone) await deleteDoc(doc(db, 'phoneIndex', phone));
+      } catch (err) {
+        console.warn('Note releasing phone number:', err);
+      }
+      try {
+        await deleteDoc(doc(db, 'passengers', uid));
       } catch (err) {
         console.warn('Note deleting passenger document:', err);
       }
-
-      // Delete the user profile document
-      try {
-        await deleteDoc(userRef);
-      } catch (err) {
-        console.warn('Note deleting user document:', err);
-      }
-    } catch (err) {
-      console.error('Error during user profile deletion:', err);
-      throw err;
+      await deleteDoc(doc(db, 'users', uid));
     }
   },
 
@@ -692,21 +773,26 @@ export const firestoreService = {
   // ================= RIDES & DISPATCH ENGINE =================
 
   async createRideRequest(rideData: Omit<RideDocument, 'id'>): Promise<string> {
-    const ridesCol = collection(db, 'rides');
-    
-    // Server-side validation of fare calculations
     const dist = rideData.estimatedDistanceKm || rideData.distanceKm || 1;
     const dur = rideData.estimatedDurationMin || rideData.estimatedDurationMinutes || 5;
-    
-    // Retrieve dynamic pricing if available, else fallback to standard ZAKA tariffs
-    const pricingConfig = ZAKA_DEFAULT_LAUNCH_PRICING[rideData.rideType] || ZAKA_DEFAULT_LAUNCH_PRICING.economy;
+
+    // Same Admin tariff the passenger was shown on the booking screen (falls back to launch tariffs).
+    // The backend re-validates this fare against the tariff before any money moves.
+    const pricingMap = await this.getPricingConfigs();
+    const pricingConfig = pricingMap[rideData.rideType] || ZAKA_DEFAULT_LAUNCH_PRICING[rideData.rideType] || ZAKA_DEFAULT_LAUNCH_PRICING.economy;
     const calculated = fareService.calculateFareBreakdown(pricingConfig, dist, dur);
-    
+
     const nowIso = new Date().toISOString();
-    const isDemo = rideData.isDemo ?? (auth.currentUser?.isAnonymous || false);
-    const docRef = await addDoc(ridesCol, {
-      ...rideData,
-      isDemo: Boolean(isDemo),
+    const isDemo = Boolean(rideData.isDemo ?? (auth.currentUser?.isAnonymous || false));
+    const pin = generateSafetyPin();
+
+    // The Safety PIN is NOT stored on the ride (the driver can read the ride). It lives in a private
+    // sub-document only the passenger can read; the security rules compare the driver's entry against it.
+    const { otp: _ignoredOtp, ...rideFields } = rideData;
+    const rideRef = doc(collection(db, 'rides'));
+    const ridePayload = removeUndefinedFields({
+      ...rideFields,
+      isDemo,
       distanceKm: dist,
       estimatedDistanceKm: dist,
       estimatedDurationMinutes: dur,
@@ -717,6 +803,7 @@ export const firestoreService = {
       estimatedFare: calculated.totalFare || rideData.estimatedFare,
       currency: 'ZAR',
       status: 'searching' as RideStatus,
+      paymentStatus: 'pending' as PaymentStatus,
       driverId: null,
       driverName: null,
       driverPhone: null,
@@ -732,6 +819,45 @@ export const firestoreService = {
       requestedAt: nowIso,
     });
 
+    const commit = async () => {
+      const batch = writeBatch(db);
+      batch.set(rideRef, ridePayload);
+      batch.set(doc(db, 'rides', rideRef.id, 'private', 'pin'), {
+        otp: pin,
+        passengerId: rideData.passengerId,
+        createdAt: nowIso,
+      });
+      await batch.commit();
+    };
+
+    try {
+      await commit();
+    } catch (err: any) {
+      if (err?.code !== 'permission-denied') throw err;
+      // A just-verified email is only reflected in the session token after a refresh
+      await auth.currentUser?.getIdToken(true).catch(() => null);
+      try {
+        await commit();
+      } catch (retryErr: any) {
+        if (retryErr?.code !== 'permission-denied') throw retryErr;
+        // Only blame email verification when the session token really is unverified
+        const token = await auth.currentUser?.getIdTokenResult().catch(() => null);
+        const verified =
+          token?.claims?.email_verified === true ||
+          token?.signInProvider === 'google.com' ||
+          token?.signInProvider === 'apple.com';
+        if (!verified) {
+          throw new Error('Please verify your email address before requesting a ride.');
+        }
+        console.error(
+          'Ride request denied by Firestore security rules for a verified account. ' +
+            'The deployed rules are probably older than this app (firestore.rules must be deployed).',
+          retryErr
+        );
+        throw new Error('We could not submit your ride request (the server denied access). Please try again or contact support.');
+      }
+    }
+
     // Create system notification for passenger
     await this.sendNotification({
       userId: rideData.passengerId,
@@ -742,7 +868,18 @@ export const firestoreService = {
       createdAt: nowIso,
     });
 
-    return docRef.id;
+    return rideRef.id;
+  },
+
+  /**
+   * Passenger only: live Safety PIN for one of their rides (the driver has no access to this document).
+   */
+  listenToRidePin(rideId: string, callback: (pin: string | null) => void) {
+    return onSnapshot(
+      doc(db, 'rides', rideId, 'private', 'pin'),
+      (snap) => callback(snap.exists() ? String(snap.data()?.otp || '') || null : null),
+      () => callback(null)
+    );
   },
 
   /**
@@ -947,7 +1084,7 @@ export const firestoreService = {
         await this.sendNotification({
           userId: r.passengerId,
           title: 'Driver Confirmed!',
-          message: `${driver.name} accepted your ride in a ${driver.vehicle?.colour || ''} ${driver.vehicle?.make || 'Vehicle'} (${driver.vehicle?.registrationNumber || ''}). Your safety PIN is ${r.otp}`,
+          message: `${driver.name} accepted your ride in a ${driver.vehicle?.colour || ''} ${driver.vehicle?.make || 'Vehicle'} (${driver.vehicle?.registrationNumber || ''}). Your Safety PIN is shown in the app.`,
           type: 'ride',
           read: false,
           createdAt: new Date().toISOString(),
@@ -1024,7 +1161,7 @@ export const firestoreService = {
         await this.sendNotification({
           userId: r.passengerId,
           title: 'Driver has arrived!',
-          message: `${r.driverName || 'Your driver'} is waiting at the pickup location. Share your PIN (${r.otp}) to begin.`,
+          message: `${r.driverName || 'Your driver'} is waiting at the pickup location. Share the Safety PIN shown in your app to begin.`,
           type: 'ride',
           read: false,
           createdAt: arrivedTime,
@@ -1038,8 +1175,14 @@ export const firestoreService = {
   },
 
   // Transition: driver_arrived -> in_progress
+  // The PIN check is ENFORCED by the Firestore security rules: the write below is rejected unless
+  // `enteredPin` equals the passenger's private PIN. The driver app never has access to the PIN itself.
   async startRide(rideId: string, driverId: string, enteredOtp?: string): Promise<{ success: boolean; message?: string }> {
     const rideRef = doc(db, 'rides', rideId);
+    const pin = (enteredOtp || '').trim();
+    if (!/^\d{4}$/.test(pin)) {
+      return { success: false, message: 'Safety PIN is required. Ask the passenger for their 4-digit code.' };
+    }
     try {
       const startTime = new Date().toISOString();
       await runTransaction(db, async (transaction) => {
@@ -1049,12 +1192,14 @@ export const firestoreService = {
         if (ride.driverId !== driverId) throw new Error('Unauthorized driver');
         if (ride.status !== 'driver_arrived') throw new Error(`Invalid status transition from ${ride.status}`);
 
-        if (enteredOtp && enteredOtp.trim() !== ride.otp) {
+        // Demo / legacy rides still carry the PIN on the ride document
+        if (ride.otp && pin !== ride.otp) {
           throw new Error('INVALID_PIN');
         }
 
         transaction.update(rideRef, {
           status: 'in_progress',
+          enteredPin: pin,
           startedAt: startTime,
           updatedAt: startTime,
         });
@@ -1074,8 +1219,8 @@ export const firestoreService = {
       }
       return { success: true };
     } catch (e: any) {
-      console.error('Failed to start ride:', e);
-      if (e.message === 'INVALID_PIN') {
+      console.warn('Failed to start ride:', e?.code || e?.message);
+      if (e?.message === 'INVALID_PIN' || e?.code === 'permission-denied') {
         return { success: false, message: 'Invalid 4-digit Safety PIN. Please verify with passenger.' };
       }
       return { success: false, message: e.message || 'Failed to start ride' };
@@ -1083,7 +1228,9 @@ export const firestoreService = {
   },
 
   // Transition: in_progress -> completed
-  async completeRide(rideId: string, driverId: string, finalFare?: number): Promise<boolean> {
+  // The fare is the one quoted at request time (locked by the security rules). Money is never marked
+  // as received here: cash is confirmed by the driver afterwards, card and wallet by the backend.
+  async completeRide(rideId: string, driverId: string, _finalFare?: number): Promise<boolean> {
     const rideRef = doc(db, 'rides', rideId);
     const driverRef = doc(db, 'drivers', driverId);
 
@@ -1091,7 +1238,6 @@ export const firestoreService = {
       const completedTime = new Date().toISOString();
       let passengerId = '';
       let passengerName = '';
-      let driverName = '';
       let calculatedFare = 0;
       let ridePaymentMethod: PaymentMethod = 'cash';
       let destinationAddr = '';
@@ -1106,41 +1252,34 @@ export const firestoreService = {
 
         passengerId = ride.passengerId;
         passengerName = ride.passengerName || 'Passenger';
-        driverName = ride.driverName || 'Driver';
-        calculatedFare = Number(finalFare) || Number(ride.finalFare) || Number(ride.estimatedFare) || 35.0;
+        calculatedFare = Number(ride.estimatedFare) || Number(ride.finalFare) || 35.0;
         ridePaymentMethod = ride.paymentMethod || 'cash';
         destinationAddr = ride.destinationAddress || 'Destination';
         isDemoRide = Boolean(ride.isDemo);
 
-        // Cash payments start as 'pending' until driver confirms receipt
-        const initialPaymentStatus: PaymentStatus = ridePaymentMethod === 'cash' ? 'pending' : 'paid';
+        const driverSnap = await transaction.get(driverRef);
 
         transaction.update(rideRef, {
           status: 'completed',
           finalFare: calculatedFare,
           completedAt: completedTime,
-          paymentStatus: initialPaymentStatus,
           updatedAt: completedTime,
         });
 
-        // Update driver stats & re-enable availability
-        const driverSnap = await transaction.get(driverRef);
+        // Trip counter and availability only. Earnings figures are derived from the payment ledger
+        // (and the lifetime total is maintained by the backend) - a driver cannot write their own earnings.
         if (driverSnap.exists()) {
           const dData = driverSnap.data() as DriverProfile;
-          const netEarnings = Math.round(calculatedFare * 0.85 * 100) / 100; // Exact 85% driver take-home rounded
           transaction.update(driverRef, {
             available: dData.online !== false, // available if still online
             totalTrips: (dData.totalTrips || 0) + 1,
-            earningsToday: (dData.earningsToday || 0) + netEarnings,
-            earningsThisWeek: (dData.earningsThisWeek || 0) + netEarnings,
-            totalEarnings: (dData.totalEarnings || 0) + netEarnings,
             updatedAt: completedTime,
           });
         }
       });
 
-      // Update passenger statistics safely
       if (passengerId) {
+        // Update passenger statistics safely
         try {
           const pRef = doc(db, 'passengers', passengerId);
           const pSnap = await getDoc(pRef);
@@ -1155,29 +1294,43 @@ export const firestoreService = {
           console.warn('Note: Passenger profile totalTrips could not be updated by driver:', passengerUpdateErr);
         }
 
-        // Record or update payment document in Firestore (1:1 with ride)
-        const initialPaymentStatus: PaymentStatus = ridePaymentMethod === 'cash' ? 'pending' : 'paid';
-        const driverEarnings = Math.round(calculatedFare * 0.85 * 100) / 100;
-        const platformFee = Math.round(calculatedFare * 0.15 * 100) / 100;
-        await this.createOrUpdatePaymentRecord({
-          rideId,
-          passengerId,
-          driverId,
-          amount: calculatedFare,
-          driverEarnings,
-          platformFee,
-          currency: 'ZAR',
-          paymentMethod: ridePaymentMethod,
-          paymentStatus: initialPaymentStatus,
-          provider: ridePaymentMethod === 'cash' ? 'cash' : 'zaka-gateway',
-          transactionReference: `ZAK-${Date.now().toString(36).toUpperCase()}`,
-          isDemo: isDemoRide,
-          createdAt: completedTime,
-          updatedAt: completedTime,
-          paidAt: initialPaymentStatus === 'paid' ? completedTime : null,
-        });
+        // Backend settlement: trusted amount + 85/15 split, wallet debit for wallet rides
+        let settledStatus: PaymentStatus = 'pending';
+        let settledCode: string | undefined;
+        const settled = await this.settleRide(rideId);
+        if (settled.success) {
+          settledStatus = (settled.paymentStatus as PaymentStatus) || 'pending';
+          settledCode = settled.code;
+          if (settled.amount) calculatedFare = Number(settled.amount);
+        } else {
+          // Backend unreachable: keep a pending ledger entry so the trip is never missing from the books
+          const { platformFee, driverEarnings } = splitFare(calculatedFare);
+          try {
+            await this.createOrUpdatePaymentRecord({
+              rideId,
+              passengerId,
+              driverId,
+              amount: calculatedFare,
+              driverEarnings,
+              platformFee,
+              platformCommission: platformFee,
+              currency: 'ZAR',
+              paymentMethod: ridePaymentMethod,
+              paymentStatus: 'pending',
+              provider: ridePaymentMethod === 'cash' ? 'cash' : ridePaymentMethod === 'wallet' ? 'zaka-wallet' : 'peach',
+              transactionReference: `ZAK-${Date.now().toString(36).toUpperCase()}`,
+              isDemo: isDemoRide,
+              createdAt: completedTime,
+              updatedAt: completedTime,
+              paidAt: null,
+            });
+          } catch (ledgerErr) {
+            console.warn('Could not record pending payment:', ledgerErr);
+          }
+        }
 
-        // Send passenger completion notification
+        const { driverEarnings: netEarnings } = splitFare(calculatedFare);
+
         if (ridePaymentMethod === 'cash') {
           await this.sendNotification({
             userId: passengerId,
@@ -1187,19 +1340,6 @@ export const firestoreService = {
             read: false,
             createdAt: completedTime,
           });
-        } else {
-          await this.sendNotification({
-            userId: passengerId,
-            title: 'Trip Completed • Paid',
-            message: `You arrived at your destination! Total fare: R${calculatedFare.toFixed(2)}. Please rate your driver.`,
-            type: 'payment',
-            read: false,
-            createdAt: completedTime,
-          });
-        }
-
-        // Send driver completion notification
-        if (ridePaymentMethod === 'cash') {
           await this.sendNotification({
             userId: driverId,
             title: 'Cash Collection Due',
@@ -1208,11 +1348,31 @@ export const firestoreService = {
             read: false,
             createdAt: completedTime,
           });
-        } else {
+        } else if (settledStatus === 'paid') {
           await this.sendNotification({
             userId: driverId,
             title: 'Trip Completed',
-            message: `Trip with ${passengerName} completed. R${(calculatedFare * 0.85).toFixed(2)} net take-home credited to your wallet.`,
+            message: `Trip with ${passengerName} completed and paid. Your earnings: R${netEarnings.toFixed(2)}.`,
+            type: 'ride',
+            read: false,
+            createdAt: completedTime,
+          });
+        } else {
+          await this.sendNotification({
+            userId: passengerId,
+            title: 'Trip Completed • Payment Due',
+            message:
+              settledCode === 'INSUFFICIENT_WALLET_BALANCE'
+                ? `You arrived at your destination. Your wallet could not cover the R${calculatedFare.toFixed(2)} fare - please pay your driver in cash or top up.`
+                : `You arrived at your destination! Total fare: R${calculatedFare.toFixed(2)}. Please complete your payment in the app.`,
+            type: 'payment',
+            read: false,
+            createdAt: completedTime,
+          });
+          await this.sendNotification({
+            userId: driverId,
+            title: 'Trip Completed • Awaiting Payment',
+            message: `Trip with ${passengerName} completed. R${netEarnings.toFixed(2)} will be credited once the passenger's payment is confirmed.`,
             type: 'ride',
             read: false,
             createdAt: completedTime,
@@ -1225,6 +1385,50 @@ export const firestoreService = {
       console.error('Failed to complete ride:', e);
       return false;
     }
+  },
+
+  /**
+   * Asks the backend to settle a completed ride (trusted fare, commission split, wallet debit).
+   * Safe to call more than once.
+   */
+  async settleRide(rideId: string): Promise<{ success: boolean; paymentStatus?: string; amount?: number; code?: string }> {
+    try {
+      const { ok, data } = await apiJson<any>('/api/rides/settle', { method: 'POST', json: { rideId } });
+      if (ok && data?.success) {
+        return { success: true, paymentStatus: data.paymentStatus, amount: data.amount, code: data.code };
+      }
+      return { success: false };
+    } catch (err) {
+      console.warn('Ride settlement request failed:', err);
+      return { success: false };
+    }
+  },
+
+  /**
+   * Passenger switches an unpaid ride to cash (e.g. card declined or wallet balance too low).
+   */
+  async switchRidePaymentToCash(rideId: string): Promise<void> {
+    await updateDoc(doc(db, 'rides', rideId), {
+      paymentMethod: 'cash',
+      updatedAt: new Date().toISOString(),
+    });
+    await this.settleRide(rideId);
+  },
+
+  /**
+   * Presence heartbeat while a driver is online. Keeps the driver visible on the passenger radar when
+   * parked, and lets the backend take the driver offline automatically if the app stops responding.
+   */
+  async sendDriverHeartbeat(driverId: string, location?: LocationCoordinates | null): Promise<void> {
+    const now = Date.now();
+    const update: Record<string, any> = {
+      lastSeenAt: new Date(now).toISOString(),
+      updatedAt: new Date(now).toISOString(),
+    };
+    if (location && !isNaN(location.latitude) && !isNaN(location.longitude)) {
+      update.currentLocation = { latitude: location.latitude, longitude: location.longitude, timestamp: now };
+    }
+    await updateDoc(doc(db, 'drivers', driverId), update);
   },
 
   // Update driver location in both driver profile and active ride document with GPS throttling
@@ -1355,14 +1559,8 @@ export const firestoreService = {
         const driverSnap = await getDoc(driverRef);
         if (driverSnap.exists()) {
           const dData = driverSnap.data() as DriverProfile;
-          const newTotalTrips = status === 'completed' ? (dData.totalTrips || 0) + 1 : (dData.totalTrips || 0);
-          const fareEarned = status === 'completed' ? (ride.finalFare || ride.estimatedFare) * 0.85 : 0;
           await updateDoc(driverRef, {
-            available: true,
-            totalTrips: newTotalTrips,
-            earningsToday: (dData.earningsToday || 0) + fareEarned,
-            earningsThisWeek: (dData.earningsThisWeek || 0) + fareEarned,
-            totalEarnings: (dData.totalEarnings || 0) + fareEarned,
+            available: dData.online !== false,
             updatedAt: new Date().toISOString(),
           });
         }
@@ -1400,7 +1598,10 @@ export const firestoreService = {
           cancellationReason: reason,
         });
 
-        if (driverToFree) {
+        // A passenger is not allowed to write to a driver's profile (the whole cancellation would be
+        // rejected). When the passenger cancels, the driver app frees itself as soon as it sees the
+        // ride end; here the driver document is only touched when the driver or an Admin cancels.
+        if (driverToFree && cancelledBy !== 'passenger') {
           const driverRef = doc(db, 'drivers', driverToFree);
           const dSnap = await transaction.get(driverRef);
           if (dSnap.exists()) {
@@ -1483,6 +1684,12 @@ export const firestoreService = {
         throw new Error('Unauthorized: only the assigned driver can confirm cash payment');
       }
 
+      if ((ride.paymentMethod || 'cash') !== 'cash') {
+        throw new Error('Only cash payments can be confirmed by the driver.');
+      }
+      const cashAmount = Number(ride.finalFare || ride.estimatedFare) || 0;
+      const cashSplit = splitFare(cashAmount);
+
       // 1. Update ride doc paymentStatus to 'paid'
       await updateDoc(rideRef, {
         paymentStatus: 'paid',
@@ -1495,12 +1702,15 @@ export const firestoreService = {
         rideId,
         passengerId: ride.passengerId,
         driverId,
-        amount: ride.finalFare || ride.estimatedFare,
+        amount: cashAmount,
+        platformFee: cashSplit.platformFee,
+        platformCommission: cashSplit.platformFee,
+        driverEarnings: cashSplit.driverEarnings,
         currency: 'ZAR',
         paymentMethod: 'cash',
         paymentStatus: 'paid',
         provider: 'cash',
-        transactionReference: `CASH-${Date.now().toString(36).toUpperCase()}`,
+        isDemo: Boolean(ride.isDemo),
         paidAt: nowIso,
         updatedAt: nowIso,
       }, { merge: true });
@@ -1535,6 +1745,32 @@ export const firestoreService = {
       callback({ id: snapshot.id, ...snapshot.data() } as PaymentRecord);
     }, (err) => {
       console.warn('Error listening to ride payment:', err);
+    });
+  },
+
+  /**
+   * Live passenger profile (wallet balance is changed by the backend, so the app must follow it)
+   */
+  listenToPassengerProfile(userId: string, callback: (profile: PassengerProfile | null) => void) {
+    return onSnapshot(
+      doc(db, 'passengers', userId),
+      (snap) => callback(snap.exists() ? (snap.data() as PassengerProfile) : null),
+      (err) => console.warn('Error listening to passenger profile:', err)
+    );
+  },
+
+  /**
+   * Wallet ledger for one user: top-ups and ride payments, newest first
+   */
+  listenToWalletTransactions(userId: string, callback: (transactions: WalletTransaction[]) => void) {
+    const q = query(collection(db, 'wallet_transactions'), where('userId', '==', userId), limit(100));
+    return onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as WalletTransaction[];
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      callback(items);
+    }, (err) => {
+      console.warn('Error listening to wallet transactions:', err);
+      callback([]);
     });
   },
 
@@ -2231,171 +2467,6 @@ export const firestoreService = {
       console.log('Initial ZAKA pricing architecture seeded to Firestore.');
     } catch (e) {
       // Handled silently
-    }
-  },
-
-  // ================= SEED INITIAL DEMO PERSONAS =================
-  async seedDemoDataIfEmpty(): Promise<void> {
-    try {
-      if (!auth.currentUser) return;
-      await this.seedInitialPricingIfEmpty();
-
-      const usersSnap = await getDocs(collection(db, 'users'));
-      if (!usersSnap.empty) {
-        return; // Already populated
-      }
-
-      console.log('🌱 Seeding initial ZAKA Firestore documents...');
-
-      // 1. Passenger: Amara Dlamini
-      const passengerId = 'passenger-amara-01';
-      await this.createUserProfile({
-        uid: passengerId,
-        name: 'Amara Dlamini',
-        phone: '+27 82 455 9012',
-        email: 'amara.dlamini@zaka.io',
-        role: 'passenger',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      await this.createOrUpdatePassenger({
-        userId: passengerId,
-        name: 'Amara Dlamini',
-        phone: '+27 82 455 9012',
-        rating: 4.9,
-        totalTrips: 34,
-        walletBalance: 85.50,
-        savedPlaces: [
-          {
-            id: 'sp-1',
-            label: 'Home',
-            address: '42 Oxford Road, Rosebank, Johannesburg',
-            location: { latitude: -26.1458, longitude: 28.0416 },
-            icon: 'home',
-          },
-          {
-            id: 'sp-2',
-            label: 'Work HQ',
-            address: 'Sandton City Office Tower, 5th St, Sandton',
-            location: { latitude: -26.1076, longitude: 28.0567 },
-            icon: 'work',
-          },
-          {
-            id: 'sp-3',
-            label: 'Airport Terminal',
-            address: 'O.R. Tambo International Airport, Kempton Park',
-            location: { latitude: -26.1367, longitude: 28.2411 },
-            icon: 'airport',
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // 2. Driver (Online & Verified): Sipho Ndlovu
-      const driverSiphoId = 'driver-sipho-01';
-      await this.createUserProfile({
-        uid: driverSiphoId,
-        name: 'Sipho Ndlovu',
-        phone: '+27 71 890 2345',
-        email: 'sipho.ndlovu@zaka.io',
-        role: 'driver',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      await this.createOrUpdateDriver({
-        userId: driverSiphoId,
-        name: 'Sipho Ndlovu',
-        phone: '+27 71 890 2345',
-        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        rating: 4.95,
-        totalTrips: 184,
-        online: true,
-        available: true,
-        verificationStatus: 'approved',
-        currentLocation: {
-          latitude: -26.1420,
-          longitude: 28.0460,
-          timestamp: Date.now(),
-        },
-        vehicle: {
-          driverId: driverSiphoId,
-          vehicleType: 'comfort',
-          make: 'Toyota',
-          model: 'Corolla Quest',
-          colour: 'Silver Metallic',
-          registrationNumber: 'ZK 89 NH GP',
-          passengerCapacity: 4,
-          status: 'active',
-        },
-        earningsToday: 64.50,
-        earningsThisWeek: 420.00,
-        totalEarnings: 3840.00,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // 3. Driver (Economy / Moto): Kofi Mensah
-      const driverKofiId = 'driver-kofi-02';
-      await this.createUserProfile({
-        uid: driverKofiId,
-        name: 'Kofi Mensah',
-        phone: '+27 83 112 4490',
-        email: 'kofi.mensah@zaka.io',
-        role: 'driver',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      await this.createOrUpdateDriver({
-        userId: driverKofiId,
-        name: 'Kofi Mensah',
-        phone: '+27 83 112 4490',
-        rating: 4.88,
-        totalTrips: 92,
-        online: true,
-        available: true,
-        verificationStatus: 'approved',
-        currentLocation: {
-          latitude: -26.1150,
-          longitude: 28.0510,
-          timestamp: Date.now(),
-        },
-        vehicle: {
-          driverId: driverKofiId,
-          vehicleType: 'economy',
-          make: 'Suzuki',
-          model: 'Swift GL',
-          colour: 'Pearl White',
-          registrationNumber: 'ZK 42 TR GP',
-          passengerCapacity: 4,
-          status: 'active',
-        },
-        earningsToday: 38.00,
-        earningsThisWeek: 260.00,
-        totalEarnings: 1950.00,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // 4. Admin: Chidi Okafor (Fleet Operations)
-      const adminId = 'admin-chidi-01';
-      await this.createUserProfile({
-        uid: adminId,
-        name: 'Chidi Okafor',
-        phone: '+27 11 400 9000',
-        email: 'admin.chidi@zaka.io',
-        role: 'admin',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      console.log('✅ ZAKA Firestore demo personas seeded successfully.');
-    } catch (e) {
-      console.warn('Notice seeding demo data:', e);
     }
   },
 };

@@ -19,6 +19,7 @@ import { fareService } from '../../services/fareService';
 import { earningsService } from '../../services/earningsService';
 import { mapService, TELEMETRY_THRESHOLDS } from '../../services/mapService';
 import { locationService } from '../../services/locationService';
+import { apiUrl, getIdToken } from '../../services/apiClient';
 import { InteractiveMap } from '../common/InteractiveMap';
 import { DriverPendingScreen } from './DriverPendingScreen';
 import { IncomingRideCard } from './IncomingRideCard';
@@ -64,10 +65,7 @@ export const DriverApp: React.FC = () => {
     isDemoTestMode,
   } = useAuth();
 
-  // If driver verification is pending or rejected, show pending review screen
-  if (!driverProfile || driverProfile.verificationStatus !== 'approved') {
-    return <DriverPendingScreen />;
-  }
+  const isPending = !driverProfile || driverProfile.verificationStatus !== 'approved';
 
   const [isOnline, setIsOnline] = useState<boolean>(driverProfile?.online ?? true);
   const [activeTrip, setActiveTrip] = useState<RideDocument | null>(null);
@@ -105,6 +103,7 @@ export const DriverApp: React.FC = () => {
     activeTripIdRef.current = activeTrip?.id || null;
   }, [activeTrip?.id]);
 
+  const mountedRef = useRef<boolean>(true);
   const userProfileUidRef = useRef<string | null>(null);
   useEffect(() => {
     userProfileUidRef.current = userProfile?.uid || null;
@@ -276,21 +275,81 @@ export const DriverApp: React.FC = () => {
     };
   }, [isOnline, isSimulatingGps]);
 
-  // Clean offline handling if driver closes, navigates away from tab, or unmounts
+  // ---- Going offline reliably -------------------------------------------------------------
+  // 1. On tab close / app termination a beacon asks the server to take this driver offline.
+  //    A beacon cannot carry headers, so a fresh ID token is kept ready and sent in the body.
+  // 2. While online a heartbeat is written every 30s. If the beacon never arrives (crash, dead
+  //    battery, lost signal) the server notices the missing heartbeat and takes the driver offline.
+  const idTokenRef = useRef<string | null>(null);
+  const isOnlineRef = useRef<boolean>(isOnline);
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (isOnline && userProfile?.uid && !isDemo) {
-        firestoreService.toggleDriverOnlineStatus(userProfile.uid, false).catch(() => {});
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (!isOnline || !userProfile?.uid || isDemo) return;
+    const uid = userProfile.uid;
+
+    const refreshToken = () => {
+      getIdToken().then((token) => {
+        idTokenRef.current = token;
+      });
+    };
+    refreshToken();
+    const tokenTimer = setInterval(refreshToken, 10 * 60 * 1000);
+
+    const beat = () => {
+      firestoreService
+        .sendDriverHeartbeat(uid, isSimulatingGps ? null : driverLocationRef.current)
+        .catch(() => {});
+    };
+    beat();
+    const heartbeatTimer = setInterval(beat, 30000);
+
+    const goOfflineNow = () => {
+      if (!isOnlineRef.current) return;
+      let delivered = false;
+      try {
+        const payload = JSON.stringify({ idToken: idTokenRef.current });
+        delivered = Boolean(
+          idTokenRef.current &&
+            navigator.sendBeacon?.(apiUrl('/api/driver/go-offline'), new Blob([payload], { type: 'application/json' }))
+        );
+      } catch {
+        delivered = false;
+      }
+      if (!delivered) {
+        firestoreService.toggleDriverOnlineStatus(uid, false).catch(() => {});
       }
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // pagehide is the only unload signal iOS Safari delivers reliably; beforeunload covers desktop browsers
+    window.addEventListener('pagehide', goOfflineNow);
+    window.addEventListener('beforeunload', goOfflineNow);
+
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (isOnline && userProfile?.uid && !isDemo) {
-        firestoreService.toggleDriverOnlineStatus(userProfile.uid, false).catch(() => {});
-      }
+      clearInterval(tokenTimer);
+      clearInterval(heartbeatTimer);
+      window.removeEventListener('pagehide', goOfflineNow);
+      window.removeEventListener('beforeunload', goOfflineNow);
     };
-  }, [isOnline, userProfile?.uid, isDemo]);
+  }, [isOnline, userProfile?.uid, isDemo, isSimulatingGps]);
+
+  // Leaving the driver console (switching to Rider, signing out) also takes the driver offline.
+  // Deferred by a tick so React's development double-mount does not knock an online driver offline.
+  useEffect(() => {
+    const uid = userProfile?.uid;
+    if (!uid || isDemo) return;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      setTimeout(() => {
+        if (!mountedRef.current && isOnlineRef.current) {
+          firestoreService.toggleDriverOnlineStatus(uid, false).catch(() => {});
+        }
+      }, 0);
+    };
+  }, [userProfile?.uid, isDemo]);
 
   // Listen to incoming searching rides across the platform
   useEffect(() => {
@@ -362,7 +421,20 @@ export const DriverApp: React.FC = () => {
       unsubscribeRides();
       unsubscribePayments();
     };
-  }, [userProfile?.uid, activeTrip, activeDemoRideId]);
+  }, [userProfile?.uid, activeTrip?.id, activeDemoRideId]);
+
+  // An online driver with no trip must be available for dispatch. This covers a passenger cancelling
+  // after acceptance (the passenger cannot write to the driver's profile). Short delay so a ride that
+  // was just accepted has time to arrive from Firestore first.
+  useEffect(() => {
+    const uid = userProfile?.uid;
+    if (!uid || isDemo || !isOnline || activeTrip || isAccepting) return;
+    if (driverProfile?.available !== false) return;
+    const timer = setTimeout(() => {
+      firestoreService.updateDriverFields(uid, { available: true }).catch(() => {});
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [userProfile?.uid, isDemo, isOnline, activeTrip?.id, isAccepting, driverProfile?.available]);
 
   // Calculate dynamic driver earnings
   const earningsSummary = useMemo(() => {
@@ -372,43 +444,48 @@ export const DriverApp: React.FC = () => {
   // Demo Mode simulated driver movement along ride route (Only when simulation is active)
   useEffect(() => {
     if (!isOnline || !isSimulatingGps || !activeTrip || !userProfile?.uid) return;
+    // Nothing to simulate unless the driver is heading somewhere: no timer is created at all
+    if (activeTrip.status !== 'driver_arriving' && activeTrip.status !== 'in_progress') return;
+
+    const target =
+      activeTrip.status === 'driver_arriving' ? activeTrip.pickupLocation : activeTrip.destinationLocation;
+    const targetLat = target.latitude;
+    const targetLng = target.longitude;
 
     const interval = setInterval(() => {
-      let targetLat = driverLocation.latitude;
-      let targetLng = driverLocation.longitude;
+      const currentLoc = driverLocationRef.current;
 
-      if (activeTrip.status === 'driver_arriving') {
-        targetLat = activeTrip.pickupLocation.latitude;
-        targetLng = activeTrip.pickupLocation.longitude;
-      } else if (activeTrip.status === 'in_progress') {
-        targetLat = activeTrip.destinationLocation.latitude;
-        targetLng = activeTrip.destinationLocation.longitude;
-      } else {
+      // Arrived (within ~15 m): stop the timer instead of ticking forever
+      if (mapService.distanceMeters(currentLoc, { latitude: targetLat, longitude: targetLng }) < 15) {
+        clearInterval(interval);
         return;
       }
 
       // Smooth step movement (12% of remaining distance)
       const step = 0.12;
-      const dLat = (targetLat - driverLocation.latitude) * step;
-      const dLng = (targetLng - driverLocation.longitude) * step;
+      const dLat = (targetLat - currentLoc.latitude) * step;
+      const dLng = (targetLng - currentLoc.longitude) * step;
 
-      const newLat = Number((driverLocation.latitude + dLat).toFixed(6));
-      const newLng = Number((driverLocation.longitude + dLng).toFixed(6));
+      const newLat = Number((currentLoc.latitude + dLat).toFixed(6));
+      const newLng = Number((currentLoc.longitude + dLng).toFixed(6));
 
       const newCoords = { latitude: newLat, longitude: newLng };
       setDriverLocation(newCoords);
 
       // Throttled Firestore sync using mapService 15m / 10s rules
-      firestoreService.updateDriverLocationAndRide(
-        userProfile.uid,
-        newCoords,
-        activeTrip.id,
-        false
-      );
+      const uid = userProfileUidRef.current;
+      if (uid) {
+        firestoreService.updateDriverLocationAndRide(
+          uid,
+          newCoords,
+          activeTrip.id,
+          false
+        );
+      }
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [isOnline, isSimulatingGps, activeTrip, driverLocation, userProfile?.uid]);
+  }, [isOnline, isSimulatingGps, activeTrip?.id, activeTrip?.status]);
 
   // Accept an incoming ride using Firestore Transaction
   const handleAcceptRide = async (ride: RideDocument) => {
@@ -455,6 +532,12 @@ export const DriverApp: React.FC = () => {
       .filter((p) => p.paymentMethod !== 'cash' && p.paymentStatus === 'paid')
       .reduce((acc, p) => acc + (p.amount || 0) * 0.85, 0);
   }, [driverPayments]);
+
+  // If driver verification is pending or rejected, show pending review screen
+  // (moved after all hooks to comply with React Rules of Hooks)
+  if (isPending) {
+    return <DriverPendingScreen />;
+  }
 
   return (
     <div id="driver-main-container" className="relative flex h-[calc(100vh-61px)] w-full flex-col overflow-hidden bg-[#F4F5F7] lg:flex-row">

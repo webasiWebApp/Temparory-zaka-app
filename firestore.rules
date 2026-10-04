@@ -31,14 +31,22 @@ service cloud.firestore {
         request.auth.token.get('role', '') == 'admin' || 
         request.auth.uid in ['Js6QAJWZskfRhInQFlX4fjlZ9Ws1', 'KCKA8mq7u6Udj5Lp4pIMSqlEgPJ2'] ||
         (
-          (request.auth.token.get('email_verified', false) == true || request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com' || request.auth.token.get('email', '') == 'ian.mkhize@gmail.com') &&
-          request.auth.token.get('email', '') in ['admin@zaka.io', 'zaka.backend.service@zaka.io', 'ian.mkhize@gmail.com']
+          (request.auth.token.get('email_verified', false) == true || request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com') &&
+          request.auth.token.get('email', '') in ['admin@zaka.io', 'zaka.backend.service@zaka.io', 'webasiinfo@gmail.com']
         )
       );
     }
 
     function isDemoAdmin() {
       return false;
+    }
+
+    // Email-verified (or federated-provider) account: required for protected operations such as requesting a ride
+    function isVerifiedAccount() {
+      return isAuthenticated() && !isAnonymous() && (
+        request.auth.token.get('email_verified', false) == true ||
+        request.auth.token.firebase.sign_in_provider in ['google.com', 'apple.com']
+      );
     }
     
     function isAdmin() {
@@ -105,18 +113,29 @@ service cloud.firestore {
     match /passengers/{passengerId} {
       // Passengers read own profile; Admin reads all; Drivers CANNOT read all passengers
       allow read: if isAuthenticated() && (
-        request.auth.uid == passengerId || 
-        isRealAdmin() || 
+        request.auth.uid == passengerId ||
+        isRealAdmin() ||
         (resource.data.get('isDemo', false) == true && isAnonymous())
       );
+      // walletBalance is credited/debited ONLY by the backend (top-ups and ride payments).
+      // Real accounts always start at zero; only isolated demo profiles may carry a seeded balance.
       allow create: if isAuthenticated() && (
-        request.auth.uid == passengerId || 
-        isRealAdmin() || 
+        isRealAdmin() ||
+        (
+          request.auth.uid == passengerId &&
+          (
+            request.resource.data.get('walletBalance', 0) == 0 ||
+            request.resource.data.get('isDemo', false) == true
+          )
+        ) ||
         (isAnonymous() && request.resource.data.get('isDemo', false) == true)
       );
       allow update: if isAuthenticated() && (
-        request.auth.uid == passengerId || 
-        isRealAdmin() || 
+        isRealAdmin() ||
+        (
+          request.auth.uid == passengerId &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['walletBalance', 'isDemo'])
+        ) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalTrips', 'rating', 'totalRatings', 'ratingSum', 'updatedAt'])
       );
       allow delete: if (isAuthenticated() && request.auth.uid == passengerId) || isRealAdmin();
@@ -181,7 +200,7 @@ service cloud.firestore {
             )
           )
         ) ||
-        (resource.data.get('isDemo', false) == true && (isAnonymous() || request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid'])) ||
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || isAnonymous())) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'totalRatings', 'ratingSum', 'updatedAt'])
       );
 
@@ -257,7 +276,7 @@ service cloud.firestore {
         resource.data.get('driverId', '') == request.auth.uid ||
         isRealAdmin() ||
         (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
-        (resource.data.get('isDemo', false) == true && (isAnonymous() || request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid']))
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || isAnonymous()))
       );
       // Drivers can create vehicle doc with status: 'pending'
       allow create: if isAuthenticated() && (
@@ -313,6 +332,64 @@ service cloud.firestore {
     // - Admin reads all rides
     // - Drivers CANNOT query all rides (bulk collection read rejected for non-admin)
     match /rides/{rideId} {
+      // Fields fixed at request time. Neither party may alter them afterwards (fare integrity).
+      function lockedRideKeys() {
+        return [
+          'passengerId', 'estimatedFare', 'baseFare', 'distanceFare', 'timeFare', 'fare',
+          'platformFee', 'platformCommission', 'distanceKm', 'estimatedDistanceKm',
+          'estimatedDurationMin', 'estimatedDurationMinutes', 'rideType', 'pickupLocation',
+          'destinationLocation', 'currency', 'isDemo', 'otp'
+        ];
+      }
+
+      function changedRideKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      // Safety PIN: the driver must submit the passenger's 4-digit PIN to start the trip.
+      // The PIN lives in /rides/{rideId}/private/pin, which the driver can never read.
+      // (Second clause keeps rides created before the private PIN document existed startable.)
+      function pinVerified() {
+        return (
+          exists(/databases/$(database)/documents/rides/$(rideId)/private/pin) &&
+          request.resource.data.get('enteredPin', '') ==
+            get(/databases/$(database)/documents/rides/$(rideId)/private/pin).data.otp
+        ) || (
+          !exists(/databases/$(database)/documents/rides/$(rideId)/private/pin) &&
+          resource.data.get('otp', '') != '' &&
+          request.resource.data.get('enteredPin', '') == resource.data.otp
+        );
+      }
+
+      // Driver side of the lifecycle: accepted -> driver_arriving -> driver_arrived -> in_progress -> completed
+      function driverTransitionAllowed() {
+        return request.resource.data.status == resource.data.status ||
+          (resource.data.status == 'accepted' && request.resource.data.status in ['driver_arriving', 'cancelled']) ||
+          (resource.data.status == 'driver_arriving' && request.resource.data.status in ['driver_arrived', 'cancelled']) ||
+          (resource.data.status == 'driver_arrived' && request.resource.data.status == 'cancelled') ||
+          (resource.data.status == 'driver_arrived' && request.resource.data.status == 'in_progress' && pinVerified()) ||
+          (resource.data.status == 'in_progress' && request.resource.data.status in ['completed', 'cancelled']);
+      }
+
+      // Only cash can be confirmed by the driver. Card / wallet are settled by the backend.
+      function driverPaymentChangeAllowed() {
+        return !changedRideKeys().hasAny(['paymentStatus']) ||
+          request.resource.data.paymentStatus == 'pending' ||
+          (
+            request.resource.data.paymentStatus == 'paid' &&
+            resource.data.get('paymentMethod', 'cash') == 'cash' &&
+            resource.data.status == 'completed'
+          );
+      }
+
+      function passengerTransitionAllowed() {
+        return request.resource.data.status == resource.data.status ||
+          (
+            request.resource.data.status == 'cancelled' &&
+            resource.data.status in ['searching', 'accepted', 'driver_arriving', 'driver_arrived']
+          );
+      }
+
       allow read: if isAuthenticated() && (
         request.auth.uid == resource.data.passengerId ||
         request.auth.uid == resource.data.driverId ||
@@ -322,44 +399,74 @@ service cloud.firestore {
         )) ||
         isRealAdmin() ||
         (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
-        (resource.data.get('isDemo', false) == true && (
-          isAnonymous() || 
-          request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid']
-        ))
+        (resource.data.get('isDemo', false) == true && isAnonymous())
       );
-      
+
+      // Real rides: verified account only, always start unassigned, unpaid and 'searching'
       allow create: if isAuthenticated() && (
-        (!isAnonymous() && request.resource.data.passengerId == request.auth.uid) || 
+        (
+          isVerifiedAccount() &&
+          request.resource.data.passengerId == request.auth.uid &&
+          request.resource.data.get('isDemo', false) != true &&
+          request.resource.data.status == 'searching' &&
+          request.resource.data.get('driverId', null) == null &&
+          request.resource.data.get('paymentStatus', 'pending') == 'pending' &&
+          request.resource.data.estimatedFare is number &&
+          request.resource.data.estimatedFare > 0
+        ) ||
         (request.resource.data.get('isDemo', false) == true && (isAnonymous() || request.resource.data.passengerId == request.auth.uid))
       );
-      
-      // Updates: Driver cannot tamper with fare, platformFee, commission, or passenger details
+
       allow update: if isAuthenticated() && (
-        isRealAdmin() || 
-        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
+        isRealAdmin() ||
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
         (
           resource.data.get('isDemo', false) != true && (
+            // Passenger: may cancel before the trip starts, retry the search, or switch an unpaid ride to cash
             (
               resource.data.passengerId == request.auth.uid &&
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driverId', 'fare', 'platformFee', 'platformCommission'])
+              !changedRideKeys().hasAny(lockedRideKeys()) &&
+              !changedRideKeys().hasAny([
+                'driverId', 'driverName', 'driverPhone', 'vehicleDetails',
+                'finalFare', 'paymentStatus', 'enteredPin', 'startedAt', 'completedAt'
+              ]) &&
+              passengerTransitionAllowed() &&
+              (
+                !changedRideKeys().hasAny(['paymentMethod']) ||
+                resource.data.get('paymentStatus', 'pending') != 'paid'
+              )
             ) ||
+            // Assigned driver: lifecycle transitions only, PIN required to start, fare cannot be altered
             (
               resource.data.driverId == request.auth.uid &&
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['fare', 'platformFee', 'platformCommission', 'passengerId'])
-            ) ||
-            (
-              resource.data.status == 'searching' && 
               request.resource.data.driverId == request.auth.uid &&
+              !changedRideKeys().hasAny(lockedRideKeys()) &&
+              !changedRideKeys().hasAny(['paymentMethod']) &&
+              (
+                !changedRideKeys().hasAny(['finalFare']) ||
+                request.resource.data.finalFare == resource.data.estimatedFare
+              ) &&
+              driverTransitionAllowed() &&
+              driverPaymentChangeAllowed()
+            ) ||
+            // Atomic acceptance of an unassigned ride by an approved driver
+            (
+              resource.data.status == 'searching' &&
+              resource.data.get('driverId', null) == null &&
+              request.resource.data.driverId == request.auth.uid &&
+              request.resource.data.status == 'accepted' &&
+              !changedRideKeys().hasAny(lockedRideKeys()) &&
+              !changedRideKeys().hasAny(['finalFare', 'paymentStatus', 'paymentMethod', 'enteredPin']) &&
               isDriver() &&
               get(/databases/$(database)/documents/drivers/$(request.auth.uid)).data.get('verificationStatus', '') == 'approved'
             )
           )
         ) ||
         (
-          resource.data.get('isDemo', false) == true && (
-            isAnonymous() || 
-            request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid'] ||
-            resource.data.passengerId == request.auth.uid || 
+          resource.data.get('isDemo', false) == true &&
+          request.resource.data.get('isDemo', false) == true && (
+            isAnonymous() ||
+            resource.data.passengerId == request.auth.uid ||
             resource.data.driverId == request.auth.uid ||
             request.resource.data.driverId == request.auth.uid
           )
@@ -367,6 +474,19 @@ service cloud.firestore {
       );
 
       allow delete: if isRealAdmin() || (isDemoAdmin() && resource.data.get('isDemo', false) == true);
+
+      // Private ride secrets (Safety PIN). Readable by the passenger and Admin only - never by the driver.
+      match /private/{secretId} {
+        allow read: if isAuthenticated() && (
+          isRealAdmin() ||
+          get(/databases/$(database)/documents/rides/$(rideId)).data.passengerId == request.auth.uid
+        );
+        allow create: if isAuthenticated() &&
+          getAfter(/databases/$(database)/documents/rides/$(rideId)).data.passengerId == request.auth.uid &&
+          request.resource.data.otp is string &&
+          request.resource.data.otp.size() == 4;
+        allow update, delete: if isRealAdmin();
+      }
     }
 
     // ==========================================
@@ -377,22 +497,29 @@ service cloud.firestore {
     // Platform revenue & full ledger readable ONLY by Admin
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && (
-        isRealAdmin() || 
-        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
-        resource == null || 
-        (resource.data.get('isDemo', false) == true && (isAnonymous() || request.auth.uid in ['demo-amara-uid', 'demo-sipho-uid', 'demo-kofi-uid'])) ||
+        isRealAdmin() ||
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || isAnonymous())) ||
         (resource.data.get('isDemo', false) != true && (
-          request.auth.uid == resource.data.passengerId || 
+          request.auth.uid == resource.data.passengerId ||
           request.auth.uid == resource.data.driverId
         ))
       );
       
+      // Clients may record a pending payment; only the backend (card / wallet) or the
+      // assigned driver (cash in hand) can produce a 'paid' record.
       allow create: if isAuthenticated() && (
-        isRealAdmin() || 
+        isRealAdmin() ||
         (
           (!isAnonymous() || request.resource.data.get('isDemo', false) == true) && (
-            request.auth.uid == request.resource.data.passengerId || 
+            request.auth.uid == request.resource.data.passengerId ||
             request.auth.uid == request.resource.data.driverId
+          ) && (
+            request.resource.data.get('paymentStatus', 'pending') != 'paid' ||
+            (
+              request.resource.data.get('paymentMethod', '') == 'cash' &&
+              request.auth.uid == request.resource.data.driverId
+            )
           )
         )
       );
@@ -422,9 +549,16 @@ service cloud.firestore {
     // 8. RATINGS COLLECTION
     // ==========================================
     match /ratings/{ratingId} {
-      allow read: if isAuthenticated();
+      // Users can only read ratings they are a participant in (fromUserId, toUserId, passengerId, driverId)
+      allow read: if isAuthenticated() && (
+        isRealAdmin() ||
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId ||
+        request.auth.uid == resource.data.passengerId ||
+        request.auth.uid == resource.data.driverId
+      );
       allow create: if isAuthenticated() && (
-        isRealAdmin() || 
+        isRealAdmin() ||
         (
           (request.auth.uid == request.resource.data.fromUserId ||
            request.auth.uid == request.resource.data.passengerId ||
@@ -434,7 +568,7 @@ service cloud.firestore {
         )
       );
       allow update: if isAuthenticated() && (
-        isRealAdmin() || 
+        isRealAdmin() ||
         request.auth.uid == resource.data.fromUserId
       );
       allow delete: if isRealAdmin();
@@ -445,17 +579,21 @@ service cloud.firestore {
     // ==========================================
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && (
-        isRealAdmin() || 
-        (isDemoAdmin() && resource.data.get('isDemo', false) == true) || 
-        resource == null || 
+        isRealAdmin() ||
+        (isDemoAdmin() && resource.data.get('isDemo', false) == true) ||
         request.auth.uid == resource.data.userId
       );
       allow create: if isAuthenticated() && (
         isRealAdmin() ||
         (
-          // Non-admin can only create notification targeting a specific user (e.g. ride status update)
           request.resource.data.userId != null &&
-          request.resource.data.userId != ''
+          request.resource.data.userId != '' &&
+          // Allow self-notifications and cross-user ride/payment/system notifications
+          // (ride lifecycle events, chat, payment confirmations, SOS alerts)
+          (
+            request.resource.data.userId == request.auth.uid ||
+            request.resource.data.type in ['ride', 'payment', 'system']
+          )
         )
       );
       allow update: if isAuthenticated() && (
@@ -549,18 +687,54 @@ service cloud.firestore {
     // 14. TEST PROBE
     // ==========================================
     match /test/{docId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
     }
 
     // ==========================================
     // 15. PHONE INDEX (Uniqueness Mapping)
     // ==========================================
     match /phoneIndex/{phone} {
-      allow read: if true;
-      allow write: if isAuthenticated() && (
+      // Single-document lookups only (needed to claim a number); the index cannot be listed or scraped.
+      allow get: if isAuthenticated();
+      allow list: if isRealAdmin();
+      allow create: if isAuthenticated() && (
         isRealAdmin() ||
         request.resource.data.get('uid', '') == request.auth.uid
       );
+      // A number already claimed by another account can never be taken over
+      allow update: if isAuthenticated() && (
+        isRealAdmin() ||
+        (
+          resource.data.get('uid', '') == request.auth.uid &&
+          request.resource.data.get('uid', '') == request.auth.uid
+        )
+      );
+      allow delete: if isAuthenticated() && (
+        isRealAdmin() ||
+        resource.data.get('uid', '') == request.auth.uid
+      );
+    }
+
+    // ==========================================
+    // 16. WALLET LEDGER (backend-written only)
+    // ==========================================
+    match /wallet_transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        isRealAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+      allow write: if isRealAdmin();
+    }
+
+    // ==========================================
+    // 17. BACKEND-ONLY SYSTEM COLLECTIONS
+    // ==========================================
+    match /processed_webhooks/{webhookId} {
+      allow read, write: if isRealAdmin();
+    }
+
+    match /system/{docId} {
+      allow read, write: if isRealAdmin();
     }
   }
 }

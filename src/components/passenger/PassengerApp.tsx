@@ -26,6 +26,8 @@ import { GlassSelectorNav, NavTabId } from '../common/GlassSelectorNav';
 import { PassengerWalletModal } from './PassengerWalletModal';
 import { RideHistoryModal } from './RideHistoryModal';
 import { ZakaWelcomeScreen } from './ZakaWelcomeScreen';
+import { paymentService } from '../../services/paymentService';
+import { fareService } from '../../services/fareService';
 
 interface PassengerAppProps {
   onOpenProfile?: () => void;
@@ -68,6 +70,29 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [isInternalHistoryOpen, setIsInternalHistoryOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
+  const [walletNotice, setWalletNotice] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  // Returning from Peach secure checkout after a wallet top-up: confirm it with the server
+  useEffect(() => {
+    if (!userProfile?.uid) return;
+    const params = new URLSearchParams(window.location.search);
+    const topupId = params.get('walletTopup');
+    if (!topupId || params.get('peachReturn') !== 'true') return;
+
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setWalletNotice('Confirming your top-up…');
+    setIsWalletOpen(true);
+    setActiveNavTab('wallet');
+    paymentService.verifyWalletTopup(topupId).then((res) => setWalletNotice(res.message));
+  }, [userProfile?.uid]);
+
+  // Ride request errors dismiss themselves
+  useEffect(() => {
+    if (!requestError) return;
+    const timer = setTimeout(() => setRequestError(null), 7000);
+    return () => clearTimeout(timer);
+  }, [requestError]);
 
   // When Profile is closed or dismissed, explicitly set the active navigation tab to: "home"
   useEffect(() => {
@@ -266,13 +291,33 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
       return;
     }
 
+    setRequestError(null);
+
+    // The driver must be able to reach the passenger: a real contact number is required
+    if (!userProfile.phone || !/^\+\d{9,15}$/.test(userProfile.phone.replace(/\s/g, ''))) {
+      setRequestError('Please add your mobile number in your Profile before requesting a ride.');
+      onOpenProfile?.();
+      return;
+    }
+
+    // Wallet rides need enough balance to cover the quoted fare
+    if (details.paymentMethod === 'wallet' && !userProfile.isDemo) {
+      const balance = passengerProfile?.walletBalance ?? 0;
+      if (balance < details.estimatedFare) {
+        setRequestError(
+          `Your wallet balance (${fareService.formatZAR(balance)}) does not cover this ${fareService.formatZAR(details.estimatedFare)} fare. Top up your wallet or choose cash.`
+        );
+        return;
+      }
+    }
+
     setIsRequesting(true);
     try {
-      const otp = Math.floor(1000 + Math.random() * 9000).toString();
+      // The Safety PIN is generated and stored privately by createRideRequest
       const rideId = await firestoreService.createRideRequest({
         passengerId: userProfile.uid,
         passengerName: userProfile.name || 'Passenger',
-        passengerPhone: userProfile.phone || '+27821234567',
+        passengerPhone: userProfile.phone,
         isDemo: userProfile.isDemo || false,
         demoPersona: userProfile.demoPersona,
         pickupAddress: details.pickup.address,
@@ -289,7 +334,6 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
         paymentMethod: details.paymentMethod,
         paymentStatus: 'pending',
         status: 'searching',
-        otp,
         requestedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       });
@@ -298,8 +342,14 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
       if (isDemoTestMode || userProfile.isDemo) {
         setActiveDemoRideId(rideId);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating ride request:', err);
+      const msg = String(err?.message || '');
+      setRequestError(
+        msg && !msg.startsWith('{')
+          ? msg
+          : 'We could not request your ride. Please check your connection and try again.'
+      );
     } finally {
       setIsRequesting(false);
     }
@@ -311,8 +361,10 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
         isOpen={isWalletOpen}
         onClose={() => {
           setIsWalletOpen(false);
+          setWalletNotice(null);
           setActiveNavTab('home');
         }}
+        initialNotice={walletNotice}
         currentPaymentMethod={selectedPaymentMethod}
         onSelectPaymentMethod={(m) => setSelectedPaymentMethod(m)}
       />
@@ -323,6 +375,16 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
           setActiveNavTab('home');
         }}
       />
+      {requestError && (
+        <div
+          id="ride-request-error"
+          role="alert"
+          onClick={() => setRequestError(null)}
+          className="fixed left-4 right-4 top-20 z-[60] mx-auto max-w-md cursor-pointer rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs font-bold text-red-700 shadow-lg"
+        >
+          {requestError}
+        </div>
+      )}
     </>
   );
 
@@ -352,7 +414,7 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
           onOpenMenu={onOpenProfile}
           onOpenProfile={onOpenProfile}
           onOpenHistory={onOpenHistory || (() => setIsInternalHistoryOpen(true))}
-          onOpenWallet={() => (userProfile?.uid ? setIsWalletOpen(true) : onOpenAuth?.('signin', 'passenger'))}
+          onOpenWallet={() => handleNavChange('wallet')}
           onConfirmRideReady={handleConfirmRideRequest}
         />
 

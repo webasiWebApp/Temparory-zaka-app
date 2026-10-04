@@ -131,11 +131,11 @@ export const RideHistoryModal: React.FC<RideHistoryModalProps> = ({ isOpen, onCl
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs cursor-pointer"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 sm:pb-28 backdrop-blur-xs cursor-pointer"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-t-[32px] sm:rounded-[32px] border border-neutral-100 bg-white p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col overflow-hidden pb-[max(1.25rem,env(safe-area-inset-bottom))] cursor-default"
+        className="w-full max-w-lg rounded-t-[32px] sm:rounded-[32px] border border-neutral-100 bg-white p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90dvh] sm:max-h-[calc(100dvh-9rem)] flex flex-col overflow-hidden pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-6 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

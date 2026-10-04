@@ -20,7 +20,60 @@ export interface PushNotificationConfig {
 let isPushRegistered = false;
 let registeredToken: string | null = null;
 
+// Browser (web) alerts: which notifications have already been announced for the signed-in user
+let announcedForUser: string | null = null;
+let announcedIds = new Set<string>();
+
+function browserNotificationsSupported(): boolean {
+  return typeof window !== 'undefined' && 'Notification' in window && !Capacitor.isNativePlatform();
+}
+
 export const notificationService = {
+  /**
+   * Asks the browser for permission to show system notifications. Browsers only allow this from a
+   * user gesture, so it is wired to the first tap / click after sign-in.
+   */
+  async enableBrowserNotifications(): Promise<boolean> {
+    if (!browserNotificationsSupported()) return false;
+    try {
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') return false;
+      return (await Notification.requestPermission()) === 'granted';
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Raises a system notification for every NEW unread ride / payment / system notification that
+   * arrives while the ZAKA tab is in the background (driver assigned, driver arrived, new payment...).
+   * When the tab is in front the in-app bell already shows it, so nothing extra is raised.
+   */
+  announceNewNotifications(userId: string, notes: NotificationRecord[]): void {
+    if (announcedForUser !== userId) {
+      // First snapshot for this user is history, not news
+      announcedForUser = userId;
+      announcedIds = new Set(notes.map((n) => n.id));
+      return;
+    }
+    for (const note of notes) {
+      if (announcedIds.has(note.id)) continue;
+      announcedIds.add(note.id);
+      if (note.read) continue;
+      if (!browserNotificationsSupported() || Notification.permission !== 'granted') continue;
+      if (typeof document !== 'undefined' && !document.hidden) continue;
+      try {
+        const alert = new Notification(note.title, { body: note.message, tag: note.id });
+        alert.onclick = () => {
+          window.focus();
+          alert.close();
+        };
+      } catch {
+        // Some mobile browsers only allow notifications from an installed web app
+      }
+    }
+  },
+
   // Push Notification Architecture Status
   getPushNotificationStatus(): PushNotificationConfig {
     if (Capacitor.isNativePlatform() && isPushRegistered && registeredToken) {
@@ -36,7 +89,7 @@ export const notificationService = {
       provider: Capacitor.isNativePlatform() ? 'apns-fcm' : 'in-app-fallback',
       statusDescription: Capacitor.isNativePlatform()
         ? 'Native APNs push listener ready.'
-        : 'Firebase Cloud Messaging (FCM) is architected for background push notifications. In-App real-time Firestore notifications are fully active and live.',
+        : 'Real-time in-app notifications are active, with browser alerts while ZAKA is open in a background tab.',
     };
   },
 

@@ -13,13 +13,14 @@ import { DriverApp } from './components/driver/DriverApp';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
+import { VerifyEmailScreen } from './components/auth/VerifyEmailScreen';
 import { RideHistoryModal } from './components/passenger/RideHistoryModal';
 import { DemoTestBanner } from './components/demo/DemoTestBanner';
 import { UserRole } from './types';
 import { isRiderTarget } from './config/appTarget';
 
 const AppContent: React.FC = () => {
-  const { currentUser, userProfile, activeRole, roles, isAdmin, isDemoTestMode, loading } = useAuth();
+  const { currentUser, userProfile, activeRole, roles, isAdmin, isDemoTestMode, loading, isEmailVerified } = useAuth();
   const [authConfig, setAuthConfig] = useState<{
     isOpen: boolean;
     mode?: 'signin' | 'signup' | 'forgot';
@@ -32,7 +33,7 @@ const AppContent: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  const isAuthenticated = Boolean(currentUser || userProfile);
+  const isAuthenticated = Boolean(currentUser && userProfile);
 
   // Automatically close auth modal whenever authenticated session is active
   React.useEffect(() => {
@@ -109,24 +110,31 @@ const AppContent: React.FC = () => {
           <DemoTestBanner />
         )}
 
-      {/* Main Role-Based Views: Strictly verified authorization */}
-      <main className="flex-1 flex flex-col w-full min-h-0 h-full relative overflow-hidden">
-        {!isRiderTarget && activeRole === 'admin' && isAdmin ? (
-          <AdminDashboard />
-        ) : !isRiderTarget && (activeRole === 'driver' || userProfile?.role === 'driver' || userProfile?.activeRole === 'driver') ? (
-          <DriverApp />
-        ) : (
-          <PassengerApp
-            onOpenAuth={handleOpenAuth}
-            onOpenProfile={handleOpenProfile}
-            onOpenHistory={handleOpenHistory}
-            isProfileOpen={isProfileOpen}
-            onCloseProfile={handleCloseProfile}
-            isHistoryOpen={isHistoryOpen}
-            onCloseHistory={handleCloseHistory}
-          />
-        )}
-      </main>
+      {/* Email Verification Gate: Block authenticated non-verified users from protected operations */}
+      {isAuthenticated && !isEmailVerified ? (
+        <main className="flex-1 flex flex-col w-full min-h-0 h-full relative overflow-hidden">
+          <VerifyEmailScreen />
+        </main>
+      ) : (
+        /* Main Role-Based Views: Strictly verified authorization */
+        <main className="flex-1 flex flex-col w-full min-h-0 h-full relative overflow-hidden">
+          {!isRiderTarget && activeRole === 'admin' && isAdmin ? (
+            <AdminDashboard />
+          ) : !isRiderTarget && (activeRole === 'driver' || userProfile?.role === 'driver' || userProfile?.activeRole === 'driver') ? (
+            <DriverApp />
+          ) : (
+            <PassengerApp
+              onOpenAuth={handleOpenAuth}
+              onOpenProfile={handleOpenProfile}
+              onOpenHistory={handleOpenHistory}
+              isProfileOpen={isProfileOpen}
+              onCloseProfile={handleCloseProfile}
+              isHistoryOpen={isHistoryOpen}
+              onCloseHistory={handleCloseHistory}
+            />
+          )}
+        </main>
+      )}
 
       {/* Auth, Profile & History Dialogs */}
       <AuthModal

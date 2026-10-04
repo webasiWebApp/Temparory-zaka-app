@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { VehicleType } from '../../types';
 import { isRiderTarget } from '../../config/appTarget';
+import { apiFetch } from '../../services/apiClient';
+import { validatePhoneNumber as validateZakaPhone, formatPhoneDisplay, normalizePhoneNumber } from '../../utils/phoneUtils';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -69,36 +71,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
   // Form states
   const [name, setName] = useState(userProfile?.name || '');
-  const [phone, setPhone] = useState(userProfile?.phone || '');
+  const [phone, setPhone] = useState(userProfile?.phone ? formatPhoneDisplay(normalizePhoneNumber(userProfile.phone)) : '');
   const [email] = useState(userProfile?.email || '');
   const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || AVATAR_PRESETS[0]);
 
   // Driver Vehicle form states
-  const [vehicleMake, setVehicleMake] = useState(driverProfile?.vehicle?.make || 'Toyota');
-  const [vehicleModel, setVehicleModel] = useState(driverProfile?.vehicle?.model || 'Corolla Quest');
-  const [vehicleColour, setVehicleColour] = useState(driverProfile?.vehicle?.colour || 'Silver');
-  const [vehiclePlate, setVehiclePlate] = useState(driverProfile?.vehicle?.registrationNumber || 'ZK 89 NH GP');
-  const [vehicleType, setVehicleType] = useState<VehicleType>(driverProfile?.vehicle?.vehicleType || 'comfort');
+  const [vehicleMake, setVehicleMake] = useState(driverProfile?.vehicle?.make || '');
+  const [vehicleModel, setVehicleModel] = useState(driverProfile?.vehicle?.model || '');
+  const [vehicleColour, setVehicleColour] = useState(driverProfile?.vehicle?.colour || '');
+  const [vehiclePlate, setVehiclePlate] = useState(driverProfile?.vehicle?.registrationNumber || '');
+  const [vehicleType, setVehicleType] = useState<VehicleType>(driverProfile?.vehicle?.vehicleType || 'economy');
 
   // Passenger Saved Places
-  const [savedPlaces, setSavedPlaces] = useState(
-    passengerProfile?.savedPlaces || [
-      {
-        id: 'sp-home',
-        label: 'Home',
-        address: '42 Oxford Road, Rosebank, Johannesburg',
-        location: { latitude: -26.1458, longitude: 28.0416 },
-        icon: 'home' as const,
-      },
-      {
-        id: 'sp-work',
-        label: 'Work',
-        address: 'Sandton City Office Tower, 5th St, Sandton',
-        location: { latitude: -26.1076, longitude: 28.0567 },
-        icon: 'work' as const,
-      },
-    ]
-  );
+  const [savedPlaces, setSavedPlaces] = useState(passengerProfile?.savedPlaces || []);
   const [newPlaceLabel, setNewPlaceLabel] = useState('');
   const [newPlaceAddress, setNewPlaceAddress] = useState('');
 
@@ -106,6 +91,44 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  // Keep the form in step with the signed-in account each time the modal is opened
+  React.useEffect(() => {
+    if (!isOpen) return;
+    setName(userProfile?.name || '');
+    setPhone(userProfile?.phone ? formatPhoneDisplay(normalizePhoneNumber(userProfile.phone)) : '');
+    setPhotoURL(userProfile?.photoURL || AVATAR_PRESETS[0]);
+    setSavedPlaces(passengerProfile?.savedPlaces || []);
+    setError('');
+    setExportNotice(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, userProfile?.uid]);
+
+  const handleExportData = async () => {
+    setExporting(true);
+    setExportNotice(null);
+    try {
+      const res = await apiFetch('/api/user/data-export', { timeoutMs: 60000 });
+      if (res.status === 429) throw new Error('You have requested several exports recently. Please try again in an hour.');
+      if (!res.ok) throw new Error('We could not prepare your data export. Please try again.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'zaka-data-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportNotice('Your data export has been downloaded.');
+    } catch (err: any) {
+      setExportNotice(err?.message || 'We could not prepare your data export. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const isPushedRef = React.useRef(false);
 
@@ -150,24 +173,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
   if (!isOpen) return null;
 
-  const validatePhoneNumber = (num: string): boolean => {
-    const cleaned = num.replace(/[\s\-()]/g, '');
-    // Allow South African formats: 0[6-8][0-9]{8} or 27[6-8][0-9]{8} or +27[6-8][0-9]{8} or standard international E.164 (10 to 15 digits)
-    const saRegex = /^(\+?27|0)[6-8][0-9]{8}$/;
-    const internationalRegex = /^\+?[1-9]\d{8,14}$/;
-    return saRegex.test(cleaned) || internationalRegex.test(cleaned);
-  };
-
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     // Phone validation
-    const trimmedPhone = phone.trim();
-    if (!validatePhoneNumber(trimmedPhone)) {
-      setError('Please enter a valid South African or international mobile number (e.g. +27 71 234 5678 or 082 123 4567).');
+    const phoneCheck = validateZakaPhone(phone);
+    if (!phoneCheck.valid) {
+      setError(phoneCheck.error || 'Please enter a valid South African mobile number (e.g. 082 123 4567).');
       return;
     }
+    // Stored once, in canonical form (+27821234567), on every profile document
+    const trimmedPhone = phoneCheck.normalized;
 
     // Name validation
     const trimmedName = name.trim();
@@ -203,11 +220,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             registrationNumber: vehiclePlate,
             vehicleType,
             passengerCapacity: vehicleType === 'xl' ? 6 : vehicleType === 'moto' ? 1 : 4,
-            status: 'active',
+            // Vehicle approval is decided by ZAKA Admin, never by the driver's own profile form
+            status: driverProfile?.vehicle?.status || 'pending',
           },
         });
       }
 
+      setPhone(formatPhoneDisplay(trimmedPhone));
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
@@ -343,7 +362,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           {saveSuccess && (
             <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-800">
               <CheckCircle2 className="h-4 w-4" />
-              <span>Profile changes saved successfully to Firestore!</span>
+              <span>Profile changes saved.</span>
             </div>
           )}
 
@@ -632,6 +651,29 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 >
                   <LogOut className="h-4 w-4" />
                   <span>{isSigningOut ? 'Signing Out of ZAKA...' : 'Sign Out of ZAKA'}</span>
+                </button>
+              </div>
+
+              {/* POPIA Compliant Data Export */}
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/40 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-neutral-600" />
+                  <span className="text-xs font-bold text-neutral-700">Download My Data (POPIA)</span>
+                </div>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Download a copy of your personal data: profile, ride and location history, payments, wallet activity, ratings and notifications.
+                </p>
+                {exportNotice && (
+                  <p className="text-xs font-bold text-neutral-700">{exportNotice}</p>
+                )}
+                <button
+                  id="btn-download-my-data"
+                  type="button"
+                  disabled={exporting}
+                  onClick={handleExportData}
+                  className="flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-50 active:scale-[0.99] transition-all disabled:opacity-50"
+                >
+                  {exporting ? 'Preparing your data…' : 'Download My Data'}
                 </button>
               </div>
 

@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { RideDocument, PaymentRecord } from '../../types';
 import { fareService } from '../../services/fareService';
 import { firestoreService } from '../../firebase/firestoreService';
+import { paymentService } from '../../services/paymentService';
 import {
   CheckCircle2,
   DollarSign,
@@ -77,11 +78,12 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
   const handleVerifyElectronic = async () => {
     setIsVerifying(true);
     try {
-      await fetch('/api/payments/peach/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rideId: ride.id }),
-      });
+      // Wallet rides are settled by the backend; card rides are confirmed against Peach
+      if (ride.paymentMethod === 'wallet') {
+        await firestoreService.settleRide(ride.id);
+      } else {
+        await paymentService.verifyPeachPayment(ride.id);
+      }
     } catch (e) {
       console.warn('Verify payment error:', e);
     } finally {

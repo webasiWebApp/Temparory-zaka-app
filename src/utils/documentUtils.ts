@@ -7,6 +7,20 @@
 import { ref, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { DriverDocumentRecord } from '../types';
+import { apiFetch } from '../services/apiClient';
+
+/**
+ * Documents held by the ZAKA server are private: they are fetched with the viewer's ID token and
+ * handed to the UI as an in-memory blob URL (nothing viewable by link alone).
+ */
+async function fetchServerDocument(serverPath: string): Promise<string> {
+  const res = await apiFetch(serverPath, { timeoutMs: 30000 });
+  if (res.status === 401) throw new Error('Your session has expired. Please sign in again to view this document.');
+  if (res.status === 403) throw new Error('You are not authorised to view this document.');
+  if (res.status === 404) throw new Error('This document is no longer available. Please ask the driver to upload it again.');
+  if (!res.ok) throw new Error('Unable to load this document. Please try again.');
+  return URL.createObjectURL(await res.blob());
+}
 
 export interface ResolvedDocument {
   url: string;
@@ -71,7 +85,7 @@ export async function resolveDocumentUrl(docRecord: DriverDocumentRecord): Promi
     }
   }
 
-  // 3. Direct absolute HTTP/HTTPS URL
+  // 3. Direct absolute HTTP/HTTPS URL (records uploaded before private storage links were introduced)
   if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
     return {
       url: fileUrl,
@@ -82,40 +96,25 @@ export async function resolveDocumentUrl(docRecord: DriverDocumentRecord): Promi
     };
   }
 
-  // 4. Server-hosted /uploads path
+  // 4. Document stored by the ZAKA server: authenticated fetch (owner driver or Admin only)
+  let serverPath = '';
   if (fileUrl.startsWith('/uploads/')) {
-    return {
-      url: fileUrl,
-      isPdf,
-      isImage,
-      mimeType,
-      fileName: docRecord.fileName || 'compliance_document',
-    };
-  }
-
-  // 5. If storagePath exists, map to /uploads/drivers/...
-  if (storagePath) {
-    const cleanPath = storagePath.replace(/^\/+/, '');
-    const mappedUrl = cleanPath.startsWith('drivers/') ? `/uploads/${cleanPath}` : `/uploads/drivers/${cleanPath}`;
-    return {
-      url: mappedUrl,
-      isPdf,
-      isImage,
-      mimeType,
-      fileName: docRecord.fileName || cleanPath.split('/').pop() || 'compliance_document',
-    };
-  }
-
-  // 6. Generic fileUrl
-  if (fileUrl) {
+    serverPath = fileUrl;
+  } else if (storagePath) {
+    const cleanPath = storagePath.replace(/^gs:\/\/[^/]+\//, '').replace(/^\/+/, '');
+    serverPath = cleanPath.startsWith('drivers/') ? `/uploads/${cleanPath}` : `/uploads/drivers/${cleanPath}`;
+  } else if (fileUrl && !fileUrl.startsWith('private://')) {
     const clean = fileUrl.replace(/^\/+/, '');
-    const mappedUrl = clean.startsWith('uploads/') ? `/${clean}` : `/uploads/${clean}`;
+    serverPath = clean.startsWith('uploads/') ? `/${clean}` : `/uploads/${clean}`;
+  }
+
+  if (serverPath) {
     return {
-      url: mappedUrl,
+      url: await fetchServerDocument(serverPath),
       isPdf,
       isImage,
       mimeType,
-      fileName: docRecord.fileName || 'compliance_document',
+      fileName: docRecord.fileName || serverPath.split('/').pop() || 'compliance_document',
     };
   }
 

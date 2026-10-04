@@ -7,6 +7,7 @@
 
 import { PaymentMethod, PaymentStatus, PaymentRecord, RideDocument } from '../types';
 import { firestoreService } from '../firebase/firestoreService';
+import { apiJson } from './apiClient';
 
 export interface PaymentGatewayConfig {
   provider: string;
@@ -48,9 +49,9 @@ export const paymentService = {
    */
   async getGatewayConfig(): Promise<PaymentGatewayConfig> {
     try {
-      const res = await fetch('/api/payments/config');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+      const { ok, status, data } = await apiJson<PaymentGatewayConfig>('/api/payments/config', { authenticated: false });
+      if (!ok) throw new Error(`HTTP ${status}`);
+      return data;
     } catch (e) {
       return {
         provider: 'peach',
@@ -61,7 +62,7 @@ export const paymentService = {
           driverPercent: 85,
           platformPercent: 15,
         },
-        message: 'ZAKA PAYMENT INTEGRATION IMPLEMENTED — AWAITING PEACH MERCHANT CREDENTIALS AND PRODUCTION ONBOARDING.',
+        message: 'Card payments are not available yet. Please pay with cash or your ZAKA wallet.',
       };
     }
   },
@@ -101,7 +102,7 @@ export const paymentService = {
             ? env === 'production'
               ? 'Peach Secure'
               : 'Peach Sandbox'
-            : 'Peach Integration Ready',
+            : 'Not available yet',
           badgeColor: isConfigured
             ? 'bg-emerald-100 text-emerald-800'
             : 'bg-amber-100 text-amber-800',
@@ -112,7 +113,7 @@ export const paymentService = {
           label: 'Electronic / Digital',
           description: 'Instant EFT, 1Voucher, Masterpass & digital payment channels via Peach Payments.',
           isConfigured,
-          badgeText: isConfigured ? 'Peach Gateway' : 'Peach Integration Ready',
+          badgeText: isConfigured ? 'Peach Gateway' : 'Not available yet',
           badgeColor: isConfigured
             ? 'bg-blue-100 text-blue-800'
             : 'bg-amber-100 text-amber-800',
@@ -139,27 +140,30 @@ export const paymentService = {
     const finalAmount = Number(ride.finalFare || ride.estimatedFare) || 35.0;
 
     if (method === 'cash') {
-      const platformFee = Math.round(finalAmount * 15) / 100;
-      const driverEarnings = Math.round((finalAmount - platformFee) * 100) / 100;
-
-      // Ensure cash payment record exists in Firestore with status 'pending'
-      const paymentId = await firestoreService.createOrUpdatePaymentRecord({
-        rideId: ride.id,
-        passengerId: ride.passengerId,
-        driverId: ride.driverId || '',
-        amount: finalAmount,
-        currency: 'ZAR',
-        paymentMethod: 'cash',
-        paymentStatus: 'pending',
-        platformCommission: platformFee,
-        platformFee,
-        driverEarnings,
-        provider: 'cash',
-        transactionReference: `CASH-${Date.now().toString(36).toUpperCase()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        paidAt: null,
-      });
+      // The trusted payment record (amount + 85/15 split) is written by the backend
+      const settled = await firestoreService.settleRide(ride.id);
+      if (!settled.success) {
+        // Backend unreachable: keep a pending entry so the trip is not missing from the ledger
+        const platformFee = Math.round(finalAmount * 15) / 100;
+        const driverEarnings = Math.round((finalAmount - platformFee) * 100) / 100;
+        await firestoreService.createOrUpdatePaymentRecord({
+          rideId: ride.id,
+          passengerId: ride.passengerId,
+          driverId: ride.driverId || '',
+          amount: finalAmount,
+          currency: 'ZAR',
+          paymentMethod: 'cash',
+          paymentStatus: 'pending',
+          platformCommission: platformFee,
+          platformFee,
+          driverEarnings,
+          provider: 'cash',
+          transactionReference: `CASH-${Date.now().toString(36).toUpperCase()}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          paidAt: null,
+        });
+      }
 
       return {
         success: true,
@@ -172,18 +176,12 @@ export const paymentService = {
 
     // Electronic Payment via Peach Payments
     try {
-      const response = await fetch('/api/payments/peach/initiate', {
+      // The amount is decided by the server from the ride itself - it is not sent from the app
+      const response = await apiJson<any>('/api/payments/peach/initiate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rideId: ride.id,
-          paymentMethod: method,
-        }),
+        json: { rideId: ride.id, paymentMethod: method },
       });
-
-      const data = await response.json();
+      const data = response.data || {};
 
       if (data.code === 'PEACH_CREDENTIALS_REQUIRED') {
         return {
@@ -193,8 +191,7 @@ export const paymentService = {
           provider: 'peach',
           merchantTransactionId: data.merchantTransactionId,
           amount: data.amount,
-          message:
-            'ZAKA PAYMENT INTEGRATION IMPLEMENTED — AWAITING PEACH MERCHANT CREDENTIALS AND PRODUCTION ONBOARDING.',
+          message: data.message || 'Card payments are not available yet. Please pay your driver in cash.',
         };
       }
 
@@ -203,7 +200,20 @@ export const paymentService = {
           success: false,
           paymentStatus: 'pending',
           provider: 'peach',
-          message: data.error || data.message || 'Unable to initiate Peach Payments checkout session.',
+          message:
+            response.status === 401
+              ? 'Your session has expired. Please sign in again to pay.'
+              : data.error || data.message || 'Unable to initiate Peach Payments checkout session.',
+        };
+      }
+
+      if (data.paymentStatus === 'paid') {
+        return {
+          success: true,
+          paymentStatus: 'paid',
+          provider: 'peach',
+          amount: data.amount,
+          message: data.message || 'Payment has already been confirmed.',
         };
       }
 
@@ -243,28 +253,18 @@ export const paymentService = {
    * Verifies Peach Payments transaction status through server-side validation
    */
   async verifyPeachPayment(
-    rideId: string,
-    checkoutId?: string,
-    merchantTransactionId?: string
+    rideId: string
   ): Promise<{ success: boolean; paymentStatus: PaymentStatus; message: string }> {
     try {
-      const res = await fetch('/api/payments/peach/verify', {
+      // The server checks the checkout it created for this ride; nothing else is accepted from the app
+      const { data } = await apiJson<any>('/api/payments/peach/verify', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rideId,
-          checkoutId,
-          merchantTransactionId,
-        }),
+        json: { rideId },
       });
-
-      const data = await res.json();
       return {
         success: Boolean(data.success),
         paymentStatus: data.paymentStatus || 'pending',
-        message: data.message || (data.success ? 'Payment verified successfully.' : 'Payment pending verification.'),
+        message: data.message || data.error || (data.success ? 'Payment verified successfully.' : 'Payment pending verification.'),
       };
     } catch (err: any) {
       console.warn('[PaymentService] Peach verify request failed:', err);
@@ -273,6 +273,58 @@ export const paymentService = {
         paymentStatus: 'pending',
         message: 'Network error verifying payment status.',
       };
+    }
+  },
+
+  /**
+   * Starts a wallet top-up. On success the caller redirects the browser to Peach secure checkout;
+   * the wallet is credited by the backend only once Peach confirms the payment.
+   */
+  async initiateWalletTopup(amount: number): Promise<{ success: boolean; redirectUrl?: string; transactionId?: string; message: string }> {
+    try {
+      const { status, data } = await apiJson<any>('/api/wallet/topup/initiate', {
+        method: 'POST',
+        json: { amount },
+      });
+      if (data?.success && data.redirectUrl) {
+        return {
+          success: true,
+          redirectUrl: data.redirectUrl,
+          transactionId: data.transactionId,
+          message: 'Redirecting to secure checkout…',
+        };
+      }
+      return {
+        success: false,
+        message:
+          status === 401
+            ? 'Your session has expired. Please sign in again.'
+            : data?.message || data?.error || 'Could not start the top-up. Please try again.',
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Could not reach the payment service.' };
+    }
+  },
+
+  /**
+   * Confirms a top-up after the user returns from checkout (the webhook normally gets there first)
+   */
+  async verifyWalletTopup(transactionId: string): Promise<{ success: boolean; amount?: number; message: string }> {
+    try {
+      const { data } = await apiJson<any>('/api/wallet/topup/verify', {
+        method: 'POST',
+        json: { transactionId },
+      });
+      if (data?.success) {
+        return {
+          success: true,
+          amount: data.amount,
+          message: `R${Number(data.amount || 0).toFixed(2)} has been added to your wallet.`,
+        };
+      }
+      return { success: false, message: data?.message || data?.error || 'Your top-up has not been confirmed yet.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Could not confirm the top-up.' };
     }
   },
 

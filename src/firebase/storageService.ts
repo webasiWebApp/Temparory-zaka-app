@@ -8,13 +8,13 @@
 import {
   ref,
   uploadBytesResumable,
-  getDownloadURL,
   deleteObject,
   UploadTaskSnapshot,
 } from 'firebase/storage';
 import { storage, auth } from './config';
 import { DriverDocumentType, DriverDocumentRecord } from '../types';
 import firebaseConfigData from '../../firebase-applet-config.json';
+import { apiUrl, getIdToken } from '../services/apiClient';
 
 export interface UploadProgressCallback {
   (progressPercent: number, bytesTransferred: number, totalBytes: number): void;
@@ -135,12 +135,28 @@ export const storageService = {
         reject(new Error('Failed to read the file for upload. Please select the file again.'));
       };
 
-      reader.onload = () => {
+      reader.onload = async () => {
         const base64Data = reader.result as string;
 
+        // The upload endpoint only accepts a driver uploading to their own profile
+        const idToken = await getIdToken();
+        if (!idToken) {
+          reject(new Error('Your session has expired. Please sign in again to upload documents.'));
+          return;
+        }
+
+        let endpoint: string;
+        try {
+          endpoint = apiUrl('/api/driver/upload-document');
+        } catch (cfgErr: any) {
+          reject(cfgErr);
+          return;
+        }
+
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/driver/upload-document');
+        xhr.open('POST', endpoint);
         xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
 
         if (xhr.upload && onProgress) {
           xhr.upload.onprogress = (evt) => {
@@ -279,19 +295,21 @@ export const storageService = {
           isSettled = true;
           clearTimeout(timeoutId);
           try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
             if (onProgress) {
               onProgress(100, file.size, file.size);
             }
+            // A Storage download URL is a permanent public link. It is never saved to Firestore
+            // (the driver document is visible to passengers). Only the storage path is recorded, and
+            // viewers obtain access at view time, subject to the Storage security rules.
             resolve({
-              fileUrl: downloadUrl,
+              fileUrl: `private://${storagePath}`,
               storagePath,
               fileName: file.name,
               fileSizeBytes: file.size,
               fileType: file.type,
             });
           } catch (err: any) {
-            reject(new Error(`Failed to retrieve file download URL: ${err.message}`));
+            reject(new Error(`Upload could not be finalised: ${err.message}`));
           }
         }
       );

@@ -291,7 +291,10 @@ export interface RideDocument {
   currency?: string;
   finalFare?: number;
   status: RideStatus;
-  otp: string; // Safety 4-digit PIN for passenger
+  // Safety PIN. Real rides keep it in /rides/{id}/private/pin (passenger-only); only demo/legacy rides carry it here.
+  otp?: string;
+  // PIN the driver submitted when starting the trip (validated by the security rules)
+  enteredPin?: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   isDemo?: boolean;
@@ -327,6 +330,7 @@ export interface PaymentRecord {
   providerTransactionId?: string;
   peachCheckoutId?: string;
   redirectUrl?: string;
+  settledByServer?: boolean; // amount and split were written by the trusted backend
   failureReason?: string;
   isDemo?: boolean;
   createdAt: string;
@@ -350,6 +354,22 @@ export interface RatingRecord {
   tip?: number;
   isDemo?: boolean;
   createdAt: string;
+}
+
+// Wallet ledger entry (written by the backend only)
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  type: 'topup' | 'ride_payment' | 'refund' | 'adjustment';
+  direction: 'credit' | 'debit';
+  amount: number;
+  currency: string;
+  status: 'pending' | 'completed' | 'failed';
+  rideId?: string;
+  description?: string;
+  balanceAfter?: number;
+  createdAt: string;
+  completedAt?: string;
 }
 
 export interface NotificationRecord {

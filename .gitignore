@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables (secrets)
+.env
+.env.local
+.env.production
+.env.staging
+
+# Firebase credentials (already committed — rotate keys)
+# firebase-applet-config.json
+
+# Driver document uploads (user data — never commit)
+uploads/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Lockfile — standardize on npm (package-lock.json)
+bun.lock
+
+# Claude Code
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Capacitor build artifacts
+ios/App/App/public/
+ios/App/App/capacitor.config.json

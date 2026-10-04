@@ -92,7 +92,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
     if (urlParams.get('peachReturn') === 'true' && urlParams.get('rideId') === ride.id) {
       setIsVerifyingPeach(true);
       paymentService
-        .verifyPeachPayment(ride.id, urlParams.get('checkoutId') || undefined)
+        .verifyPeachPayment(ride.id)
         .then((res) => {
           if (res.success) {
             setPaymentNotice('Peach payment confirmed successfully!');
@@ -106,21 +106,48 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
     }
   }, [ride.id]);
 
-  const isCash = ride.paymentMethod === 'cash';
-  const isPaid = paymentRecord?.paymentStatus === 'paid';
+  const paymentMethod = paymentRecord?.paymentMethod || ride.paymentMethod;
+  const isCash = paymentMethod === 'cash';
+  const isWallet = paymentMethod === 'wallet';
+  const isPaid = paymentRecord?.paymentStatus === 'paid' || ride.paymentStatus === 'paid';
+  const walletShort = isWallet && !isPaid && paymentRecord?.failureReason === 'INSUFFICIENT_WALLET_BALANCE';
+
+  // Fallback settlement: normally the driver app triggers it when the trip ends
+  useEffect(() => {
+    if (ride.status === 'completed' && ride.paymentStatus !== 'paid') {
+      firestoreService.settleRide(ride.id).catch(() => {});
+    }
+  }, [ride.id, ride.status]);
+
+  const handleRetryWalletPayment = async () => {
+    setIsProcessingPayment(true);
+    setPaymentNotice(null);
+    try {
+      const res = await firestoreService.settleRide(ride.id);
+      if (res.success && res.paymentStatus === 'paid') {
+        setPaymentNotice('Paid from your ZAKA wallet.');
+      } else if (res.code === 'INSUFFICIENT_WALLET_BALANCE') {
+        setPaymentNotice('Your wallet balance is still too low. Top up or switch to cash.');
+      } else {
+        setPaymentNotice('Could not complete the wallet payment. Please try again.');
+      }
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   const handleInitiateCardPayment = async () => {
     setIsProcessingPayment(true);
     setPaymentNotice(null);
     try {
       const initResult = await paymentService.processPaymentInitiation(
-        { ...ride, finalFare: finalFare + tipVal },
+        ride,
         'card'
       );
       if (initResult.success && initResult.redirectUrl) {
         window.location.href = initResult.redirectUrl;
       } else if (initResult.success) {
-        setPaymentNotice('Payment initiated successfully.');
+        setPaymentNotice(initResult.paymentStatus === 'paid' ? 'Payment confirmed.' : 'Payment started. Awaiting confirmation.');
       } else {
         setPaymentNotice(initResult.message || 'Payment gateway connection error.');
       }
@@ -134,11 +161,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
   const handleVerifyStatus = async () => {
     setIsVerifyingPeach(true);
     try {
-      const res = await paymentService.verifyPeachPayment(
-        ride.id,
-        paymentRecord?.peachCheckoutId,
-        paymentRecord?.merchantTransactionId
-      );
+      const res = await paymentService.verifyPeachPayment(ride.id);
       setPaymentNotice(res.message);
     } catch (e: any) {
       setPaymentNotice('Verification check error.');
@@ -149,12 +172,11 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
 
   const handleSwitchToCash = async () => {
     try {
-      await firestoreService.updateRideStatus(ride.id, 'completed', {
-        paymentMethod: 'cash',
-      });
-      await paymentService.processPaymentInitiation({ ...ride, paymentMethod: 'cash' }, 'cash');
+      await firestoreService.switchRidePaymentToCash(ride.id);
+      setPaymentNotice('Switched to cash. Please pay your driver directly.');
     } catch (e) {
       console.warn('Error switching to cash:', e);
+      setPaymentNotice('Could not switch to cash. Please try again.');
     }
   };
 
@@ -224,15 +246,15 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
               {ride.driverName ? ride.driverName.charAt(0) : 'D'}
             </div>
             <div className="min-w-0">
-              <h4 className="text-sm font-black text-neutral-900 truncate">{ride.driverName || 'Sipho Ndlovu'}</h4>
+              <h4 className="text-sm font-black text-neutral-900 truncate">{ride.driverName || 'Your driver'}</h4>
               <p className="text-[11px] text-neutral-500 truncate font-semibold">
-                {ride.vehicleDetails?.colour || 'Silver'} {ride.vehicleDetails?.make || 'Toyota'} {ride.vehicleDetails?.model || 'Corolla'}
+                {[ride.vehicleDetails?.colour, ride.vehicleDetails?.make, ride.vehicleDetails?.model].filter(Boolean).join(' ') || 'Vehicle'}
               </p>
             </div>
           </div>
           <div className="text-right shrink-0">
             <span className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-1 font-mono text-xs font-black text-neutral-900">
-              {ride.vehicleDetails?.registrationNumber || 'ZK 89 GP'}
+              {ride.vehicleDetails?.registrationNumber || '—'}
             </span>
           </div>
         </div>
@@ -258,11 +280,11 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
         <div className="grid grid-cols-3 gap-2 border-t border-neutral-100 pt-3 text-center text-[11px]">
           <div>
             <span className="text-neutral-400 block text-[10px] font-semibold">Distance</span>
-            <span className="font-black text-neutral-900">{ride.estimatedDistanceKm || 5.2} km</span>
+            <span className="font-black text-neutral-900">{ride.estimatedDistanceKm ?? '—'} km</span>
           </div>
           <div>
             <span className="text-neutral-400 block text-[10px] font-semibold">Duration</span>
-            <span className="font-black text-neutral-900">{ride.estimatedDurationMin || 14} min</span>
+            <span className="font-black text-neutral-900">{ride.estimatedDurationMin ?? '—'} min</span>
           </div>
           <div>
             <span className="text-neutral-400 block text-[10px] font-semibold">Completed</span>
@@ -277,17 +299,17 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
           <div className="flex items-center gap-2">
             {isCash ? (
               <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
-            ) : ride.paymentMethod === 'card' ? (
+            ) : paymentMethod === 'card' || paymentMethod === 'digital' ? (
               <CreditCard className="h-4 w-4 text-blue-600 shrink-0" />
             ) : (
               <Wallet className="h-4 w-4 text-[#FF7A00] shrink-0" />
             )}
             <span className="text-neutral-600 font-bold uppercase tracking-wide text-[11px]">
-              {ride.paymentMethod === 'cash' ? 'Cash Payment' : ride.paymentMethod === 'card' ? 'Card Gateway' : 'Digital Wallet'}
+              {isCash ? 'Cash Payment' : isWallet ? 'ZAKA Wallet' : 'Card Payment'}
             </span>
           </div>
           <span className="font-black text-neutral-900 text-lg">
-            {fareService.formatZAR(finalFare + tipVal)}
+            {fareService.formatZAR(finalFare)}
           </span>
         </div>
 
@@ -314,10 +336,64 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                 <div>
                   <span className="font-bold block">Cash Due to Driver</span>
                   <span className="text-[11px] text-amber-800">
-                    Please pay {fareService.formatZAR(finalFare + tipVal)} directly to your driver.
+                    Please pay {fareService.formatZAR(finalFare)} directly to your driver{tipVal > 0 ? `, plus your ${fareService.formatZAR(tipVal)} tip` : ''}.
                   </span>
                 </div>
               </>
+            )}
+          </div>
+        ) : isWallet ? (
+          <div className="space-y-2">
+            <div className={`rounded-2xl p-3 text-xs flex items-center justify-between gap-2 ${
+              isPaid
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                : 'bg-amber-50 text-amber-900 border border-amber-200'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                {isPaid ? (
+                  <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+                ) : (
+                  <Wallet className="h-4.5 w-4.5 text-amber-600 shrink-0" />
+                )}
+                <div>
+                  <span className="font-bold block">
+                    {isPaid ? 'Paid from ZAKA Wallet ✓' : walletShort ? 'Wallet balance too low' : 'Wallet payment processing'}
+                  </span>
+                  <span className="text-[11px] text-neutral-600">
+                    {isPaid
+                      ? `${fareService.formatZAR(finalFare)} was deducted from your wallet.`
+                      : walletShort
+                        ? 'Top up your wallet and retry, or pay your driver in cash.'
+                        : 'Confirming your wallet payment…'}
+                  </span>
+                </div>
+              </div>
+              {!isPaid && (
+                <button
+                  type="button"
+                  onClick={handleRetryWalletPayment}
+                  disabled={isProcessingPayment}
+                  className="shrink-0 rounded-full bg-neutral-900 px-3 py-1.5 text-xs font-black text-white hover:bg-neutral-800 active:scale-95 transition-all"
+                >
+                  {isProcessingPayment ? 'Checking…' : 'Retry'}
+                </button>
+              )}
+            </div>
+
+            {paymentNotice && (
+              <p className="text-center text-xs font-bold text-neutral-700">{paymentNotice}</p>
+            )}
+
+            {!isPaid && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleSwitchToCash}
+                  className="text-xs font-bold text-neutral-500 hover:text-neutral-900 underline underline-offset-2"
+                >
+                  Pay your driver in cash instead
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -380,7 +456,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
           </div>
           {tipVal > 0 && (
             <div className="flex justify-between text-emerald-600 font-semibold">
-              <span>Driver Tip</span>
+              <span>Driver Tip (given in cash)</span>
               <span>+{fareService.formatZAR(tipVal)}</span>
             </div>
           )}

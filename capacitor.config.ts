@@ -15,6 +15,12 @@ const config: CapacitorConfig = {
     scheme: 'ZAKA',
   },
   plugins: {
+    // Native Google / Apple sign-in sheets. The credential is handed to the Firebase JS SDK
+    // (skipNativeAuth), so the web layer remains the single source of auth state.
+    FirebaseAuthentication: {
+      skipNativeAuth: true,
+      providers: ['google.com', 'apple.com'],
+    },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },

@@ -12,6 +12,7 @@ import { firestoreService } from '../../firebase/firestoreService';
 import { NotificationRecord, UserRole } from '../../types';
 import { NotificationCenterModal } from './NotificationCenterModal';
 import { isRiderTarget } from '../../config/appTarget';
+import { notificationService } from '../../services/notificationService';
 import {
   Bell,
   User,
@@ -55,11 +56,22 @@ export const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     if (userProfile?.uid) {
-      const unsubscribe = firestoreService.listenToUserNotifications(
-        userProfile.uid,
-        (notes) => setNotifications(notes)
-      );
-      return () => unsubscribe();
+      const uid = userProfile.uid;
+      const unsubscribe = firestoreService.listenToUserNotifications(uid, (notes) => {
+        setNotifications(notes);
+        notificationService.announceNewNotifications(uid, notes);
+      });
+
+      // Permission prompts must come from a user gesture: ask on the first interaction after sign-in
+      const askOnce = () => {
+        notificationService.enableBrowserNotifications().catch(() => {});
+      };
+      window.addEventListener('pointerdown', askOnce, { once: true });
+
+      return () => {
+        unsubscribe();
+        window.removeEventListener('pointerdown', askOnce);
+      };
     } else {
       setNotifications([]);
     }

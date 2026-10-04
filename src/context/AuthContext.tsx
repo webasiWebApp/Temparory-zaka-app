@@ -18,8 +18,10 @@ import {
   onAuthStateChanged,
   updateProfile,
   signInAnonymously,
+  signInWithCredential,
   sendEmailVerification,
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { auth, db } from '../firebase/config';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { firestoreService } from '../firebase/firestoreService';
@@ -35,6 +37,7 @@ import { isRiderTarget } from '../config/appTarget';
 import { notificationService } from '../services/notificationService';
 import { onAppResume } from '../services/appLifecycleService';
 import { normalizePhoneNumber, validatePhoneNumber } from '../utils/phoneUtils';
+import { storageService } from '../firebase/storageService';
 
 interface SignUpData {
   email: string;
@@ -91,39 +94,75 @@ interface AuthContextType {
   refreshProfiles: () => Promise<void>;
 }
 
+// Demo mode exists for sales demonstrations only. It is compiled out of production builds:
+// unless VITE_ENABLE_DEMO_MODE=true every demo entry point refuses to run, and no demo
+// credential is present in the bundle (the password is supplied through the build environment).
+const DEMO_MODE_ENABLED = import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
+const DEMO_ACCOUNT_PASSWORD = DEMO_MODE_ENABLED ? String(import.meta.env.VITE_DEMO_ACCOUNT_PASSWORD || '') : '';
+
 export const DEMO_IDENTITIES = {
   amara: {
     email: 'demo.amara.dlamini@zaka-internal.app',
-    pass: 'ZakaDemo2026!Sec',
+    pass: DEMO_ACCOUNT_PASSWORD,
     uid: 'lVpNZkKx9mMnqEMXrKzjgFm2Ju42',
     name: 'Amara Dlamini',
     role: 'passenger' as UserRole,
   },
   sipho: {
     email: 'demo.sipho.nkosi@zaka-internal.app',
-    pass: 'ZakaDemo2026!Sec',
+    pass: DEMO_ACCOUNT_PASSWORD,
     uid: 'qSI9wgzICxOra8JwdxLfFYviBdh2',
     name: 'Sipho Nkosi',
     role: 'driver' as UserRole,
   },
   kofi: {
     email: 'demo.kofi.mensah@zaka-internal.app',
-    pass: 'ZakaDemo2026!Sec',
+    pass: DEMO_ACCOUNT_PASSWORD,
     name: 'Kofi Mensah',
     role: 'driver' as UserRole,
   },
   chidi: {
     email: 'demo.chidi.okonjo@zaka-internal.app',
-    pass: 'ZakaDemo2026!Sec',
+    pass: DEMO_ACCOUNT_PASSWORD,
     name: 'Chidi Okonjo',
     role: 'admin' as UserRole,
   },
 };
 
+const DEMO_DISABLED_MESSAGE = 'Demo mode is not available in this build.';
+
+/** Federated providers verify the email address themselves */
+function hasVerifiedProvider(user?: FirebaseUser | null): boolean {
+  return Boolean(user?.providerData?.some((p) => p.providerId === 'google.com' || p.providerId === 'apple.com'));
+}
+
+/** Verification comes from Firebase Auth only - never from a field the user can write in Firestore */
+function isAuthEmailVerified(user?: FirebaseUser | null): boolean {
+  return Boolean(user && (user.emailVerified || hasVerifiedProvider(user)));
+}
+
+// Last role this account was confirmed to hold, remembered on the device. Used only when the profile
+// cannot be loaded (offline / timeout) so that a Driver is never shown the Rider app by mistake.
+function rememberRole(uid: string, role: UserRole) {
+  try {
+    localStorage.setItem(`zaka_last_role_${uid}`, role);
+  } catch {
+    // storage unavailable
+  }
+}
+
+function recallRole(uid: string): UserRole | null {
+  try {
+    const v = localStorage.getItem(`zaka_last_role_${uid}`);
+    return v === 'driver' || v === 'passenger' || v === 'admin' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export const ADMIN_EMAILS = [
   'admin@zaka.io',
-  'zaka.backend.service@zaka.io',
-  'ian.mkhize@gmail.com',
+  'webasiinfo@gmail.com',
 ];
 
 export const ADMIN_UIDS = [
@@ -143,14 +182,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Authoritative verified admin computation (never allow self-escalation or demo bypass)
   const userEmail = (currentUser?.email || userProfile?.email || '').trim().toLowerCase();
+  // Mirrors firestore.rules isRealAdmin(): allow-listed UID, or allow-listed email that is verified.
+  // The role stored in Firestore is never enough on its own.
   const isAdmin = Boolean(
     currentUser &&
+    !currentUser.isAnonymous &&
     !userProfile?.isDemo &&
     (
-      userProfile?.role === 'admin' ||
-      (Array.isArray(userProfile?.roles) && userProfile.roles.includes('admin')) ||
-      (userEmail && ADMIN_EMAILS.includes(userEmail)) ||
-      ADMIN_UIDS.includes(currentUser.uid)
+      ADMIN_UIDS.includes(currentUser.uid) ||
+      (userEmail && ADMIN_EMAILS.includes(userEmail) && isAuthEmailVerified(currentUser))
     )
   );
 
@@ -178,12 +218,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [userProfile, isAdmin]);
 
   // Authoritative email verification status
+  // (`userProfile.emailVerified` in memory is set from Firebase Auth by fetchProfiles /
+  // checkEmailVerification - it is what makes the screen re-render after verification.)
   const isEmailVerified: boolean = Boolean(
-    currentUser?.emailVerified ||
-    currentUser?.providerData.some((p) => p.providerId === 'google.com' || p.providerId === 'apple.com') ||
-    userProfile?.emailVerified ||
+    isAuthEmailVerified(currentUser) ||
+    (userProfile?.emailVerified && isAuthEmailVerified(auth.currentUser)) ||
     isAdmin ||
-    userProfile?.isDemo
+    (DEMO_MODE_ENABLED && userProfile?.isDemo)
   );
 
   const [verificationEmailSent, setVerificationEmailSent] = useState<boolean>(false);
@@ -263,6 +304,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await user.reload();
     const verified = Boolean(user.emailVerified);
     if (verified) {
+      // The security rules read email_verified from the ID token, which only changes on refresh
+      await user.getIdToken(true).catch(() => null);
       if (userProfile?.uid) {
         try {
           await firestoreService.updateUserProfile(userProfile.uid, { emailVerified: true });
@@ -314,7 +357,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isSigningInRef = useRef<boolean>(false);
 
   // Demo Simulation State
+  // Demo mode is gated by VITE_ENABLE_DEMO_MODE env variable — set to 'true' to enable.
+  // In production builds, omit this variable or set to 'false' to disable all demo features.
+  const isDemoEnabled = DEMO_MODE_ENABLED;
   const [isDemoTestMode, setIsDemoTestMode] = useState<boolean>(() => {
+    if (!isDemoEnabled) return false;
     try {
       return sessionStorage.getItem('zaka_demo_test_mode') === 'true';
     } catch {
@@ -357,9 +404,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userAuth = fbUser || currentUser || auth.currentUser;
       const userEmail = (userAuth?.email || '').trim().toLowerCase();
       const isAdminAccount =
-        ADMIN_EMAILS.includes(userEmail) ||
+        (ADMIN_EMAILS.includes(userEmail) && isAuthEmailVerified(userAuth)) ||
         Boolean(userAuth && ADMIN_UIDS.includes(userAuth.uid));
 
+      // Throws when the profile cannot be read; only a genuinely missing profile returns null
       let uProfile = await firestoreService.getUserProfile(uid);
 
       // If user profile is missing in Firestore, recover/provision it automatically
@@ -369,7 +417,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           uProfile = {
             uid,
             name: userAuth.displayName || 'ZAKA Fleet Administrator',
-            phone: userAuth.phoneNumber || '+27 11 000 0000',
+            phone: userAuth.phoneNumber || '',
             email: userEmail,
             role: 'admin',
             status: 'active',
@@ -467,11 +515,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const isVerified = Boolean(
-          userAuth?.emailVerified ||
-          (userAuth?.providerData && userAuth.providerData.some((p) => p.providerId === 'google.com' || p.providerId === 'apple.com')) ||
-          uProfile.emailVerified ||
-          isAdminAccount
+          isAuthEmailVerified(userAuth) ||
+          isAdminAccount ||
+          (DEMO_MODE_ENABLED && uProfile.isDemo)
         );
+
+        // Keep the stored flag in step with Firebase Auth (used by data-retention housekeeping)
+        if (isAuthEmailVerified(userAuth) && uProfile.emailVerified !== true) {
+          firestoreService.updateUserProfile(uid, { emailVerified: true }).catch(() => {});
+        }
 
         // Auto-heal/sanitize database state if previously contaminated with admin role
         if (!isAdminAccount && (uProfile.role === 'admin' || uProfile.activeRole === 'admin' || rawUserRoles.includes('admin'))) {
@@ -492,6 +544,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUserProfile(uProfile);
         setRawActiveRole(effectiveActiveRole);
+        rememberRole(uid, effectiveActiveRole);
 
         // Load passenger profile ONLY if user actually has passenger role and is not purely a driver
         if ((userRoles.includes('passenger') || isRiderTarget) && uProfile.role !== 'driver') {
@@ -503,7 +556,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               phone: uProfile.phone || '',
               rating: 5.0,
               totalTrips: 0,
-              walletBalance: 50.0,
+              walletBalance: 0,
               savedPlaces: [],
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -512,7 +565,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else if (uProfile.phone && (!pProfile.phone || pProfile.phone.includes('000 0000'))) {
             // Keep passenger profile phone in sync with user's verified phone
             pProfile = { ...pProfile, phone: uProfile.phone };
-            firestoreService.createOrUpdatePassenger(pProfile).catch(() => {});
+            const { walletBalance: _serverOwned, ...passengerFields } = pProfile;
+            firestoreService.createOrUpdatePassenger(passengerFields as PassengerProfile).catch(() => {});
           } else if (pProfile.phone && (!uProfile.phone || uProfile.phone.includes('000 0000'))) {
             // Recover real phone from passenger profile into userProfile
             uProfile.phone = pProfile.phone;
@@ -538,9 +592,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (userAuth && !userProfile) {
         const userEmail = (userAuth?.email || '').trim().toLowerCase();
         const isAdminAccount =
-          ADMIN_EMAILS.includes(userEmail) ||
+          (ADMIN_EMAILS.includes(userEmail) && isAuthEmailVerified(userAuth)) ||
           Boolean(userAuth && ADMIN_UIDS.includes(userAuth.uid));
-        const fallbackRole: UserRole = isAdminAccount ? 'admin' : 'passenger';
+        // The profile could not be loaded. Use the role this account last had on this device rather
+        // than assuming Rider. Nothing is written back, so the stored role is never overwritten.
+        const fallbackRole: UserRole = isAdminAccount ? 'admin' : (recallRole(uid) === 'driver' ? 'driver' : 'passenger');
         const fallbackProfile: UserProfile = {
           uid,
           name: userAuth.displayName || 'ZAKA Member',
@@ -551,11 +607,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           activeRole: fallbackRole,
           status: 'active',
           accountStatus: 'active',
+          emailVerified: isAuthEmailVerified(userAuth),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         setUserProfile(fallbackProfile);
-        setRawActiveRole(fallbackRole);
+        setRawActiveRole(isRiderTarget ? 'passenger' : fallbackRole);
       }
     }
   };
@@ -616,6 +673,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => unsubDriver();
   }, [currentUser?.uid, userProfile?.uid, userProfile?.role, activeRole]);
+
+  // Real-time listener on the passenger document: the wallet balance is credited / debited by the backend
+  useEffect(() => {
+    const uid = currentUser?.uid;
+    if (!uid || !passengerProfile?.userId || passengerProfile.userId !== uid) {
+      return;
+    }
+    const unsubPassenger = firestoreService.listenToPassengerProfile(uid, (fresh) => {
+      if (fresh) setPassengerProfile((prev) => (prev ? { ...prev, ...fresh } : fresh));
+    });
+    return () => unsubPassenger();
+  }, [currentUser?.uid, passengerProfile?.userId]);
 
   // Listen to app foregrounding and network reconnects to refresh profile and rides
   useEffect(() => {
@@ -726,168 +795,96 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithGoogle = async (preferredRole: UserRole = 'passenger') => {
-    setLoading(true);
-    try {
+  /**
+   * Obtains a Firebase session from Google or Apple.
+   * - Web: standard popup.
+   * - Native iOS/Android (Capacitor): popups and redirects do not work inside the WebView, so the
+   *   native Google / Apple sign-in sheet is used and its credential is handed to the Firebase JS SDK.
+   */
+  const federatedSignIn = async (providerId: 'google.com' | 'apple.com'): Promise<FirebaseUser> => {
+    if (Capacitor.isNativePlatform()) {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+      if (providerId === 'google.com') {
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        const idToken = result.credential?.idToken;
+        if (!idToken) throw new Error('Google sign-in did not return a credential. Please try again.');
+        const credential = GoogleAuthProvider.credential(idToken, result.credential?.accessToken);
+        return (await signInWithCredential(auth, credential)).user;
+      }
+      const result = await FirebaseAuthentication.signInWithApple();
+      const idToken = result.credential?.idToken;
+      if (!idToken) throw new Error('Apple sign-in did not return a credential. Please try again.');
+      const appleProvider = new OAuthProvider('apple.com');
+      const credential = appleProvider.credential({ idToken, rawNonce: result.credential?.nonce });
+      return (await signInWithCredential(auth, credential)).user;
+    }
+
+    if (providerId === 'google.com') {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const res = await signInWithPopup(auth, provider);
-      const uid = res.user.uid;
-
-      // Check if user profile already exists
-      let uProfile = await firestoreService.getUserProfile(uid);
-      if (!uProfile) {
-        const assignedRole: UserRole = preferredRole === 'driver' ? 'driver' : 'passenger';
-        const now = new Date().toISOString();
-        uProfile = {
-          uid,
-          name: res.user.displayName || 'ZAKA User',
-          phone: res.user.phoneNumber || '+27 82 000 0000',
-          email: res.user.email || '',
-          photoURL: res.user.photoURL || '',
-          role: assignedRole,
-          roles: [assignedRole],
-          activeRole: assignedRole,
-          status: 'active',
-          accountStatus: 'active',
-          createdAt: now,
-          updatedAt: now,
-        };
-        await firestoreService.createUserProfile(uProfile);
-
-        if (assignedRole === 'passenger') {
-          const pProf: PassengerProfile = {
-            userId: uid,
-            name: uProfile.name,
-            phone: uProfile.phone,
-            rating: 5.0,
-            totalTrips: 0,
-            walletBalance: 50.0,
-            savedPlaces: [
-              {
-                id: 'sp-home',
-                label: 'Home',
-                address: '42 Oxford Road, Rosebank, Johannesburg',
-                location: { latitude: -26.1458, longitude: 28.0416 },
-                icon: 'home',
-              },
-            ],
-            createdAt: now,
-            updatedAt: now,
-          };
-          await firestoreService.createOrUpdatePassenger(pProf);
-          setPassengerProfile(pProf);
-          setDriverProfile(null);
-        } else if (assignedRole === 'driver') {
-          const dProf: DriverProfile = {
-            userId: uid,
-            name: uProfile.name,
-            phone: uProfile.phone,
-            photoURL: uProfile.photoURL,
-            rating: 5.0,
-            totalTrips: 0,
-            online: false,
-            available: false,
-            verificationStatus: 'pending',
-            currentLocation: {
-              latitude: -26.1458,
-              longitude: 28.0416,
-              timestamp: Date.now(),
-            },
-            earningsToday: 0,
-            earningsThisWeek: 0,
-            totalEarnings: 0,
-            createdAt: now,
-            updatedAt: now,
-          };
-          await firestoreService.createOrUpdateDriver(dProf);
-          setDriverProfile(dProf);
-          setPassengerProfile(null);
-        }
-      } else {
-        if (uProfile.role === 'passenger' || (!uProfile.role && !uProfile.roles?.includes('driver'))) {
-          const pProfile = await firestoreService.getPassengerProfile(uid);
-          setPassengerProfile(pProfile);
-        }
-        if (uProfile.role === 'driver' || uProfile.roles?.includes('driver')) {
-          const dProfile = await firestoreService.getDriverProfile(uid);
-          setDriverProfile(dProfile);
-        }
-      }
-
-      setCurrentUser(res.user);
-      setUserProfile(uProfile);
-      const targetRole: UserRole = isRiderTarget
-        ? 'passenger'
-        : (uProfile.activeRole || uProfile.role || preferredRole || 'passenger');
-      setRawActiveRole(targetRole);
-
-      if (isRiderTarget) {
-        notificationService.registerNativePush(uid).catch(() => {});
-      }
-    } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
-        console.log('Google Sign In was dismissed by user.');
-      } else {
-        console.error('Google Sign In error:', err);
-      }
-      throw new Error(getReadableAuthError(err));
-    } finally {
-      setLoading(false);
+      return (await signInWithPopup(auth, provider)).user;
     }
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    return (await signInWithPopup(auth, provider)).user;
   };
 
-  const signInWithApple = async (preferredRole: UserRole = 'passenger') => {
+  const signInWithProvider = async (
+    providerId: 'google.com' | 'apple.com',
+    preferredRole: UserRole,
+    defaultName: string
+  ) => {
     setLoading(true);
+    isSigningInRef.current = true;
+    const label = providerId === 'google.com' ? 'Google' : 'Apple';
     try {
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('email');
-      provider.addScope('name');
-      const res = await signInWithPopup(auth, provider);
-      const uid = res.user.uid;
+      const fbUser = await federatedSignIn(providerId);
+      const uid = fbUser.uid;
 
-      // Check if user profile already exists
-      let uProfile = await firestoreService.getUserProfile(uid);
-      if (!uProfile) {
+      // Returning account: load it exactly like an email/password sign-in (role is read, never re-assigned)
+      const existing = await firestoreService.getUserProfile(uid);
+      if (!existing) {
         const assignedRole: UserRole = isRiderTarget ? 'passenger' : (preferredRole === 'driver' ? 'driver' : 'passenger');
         const now = new Date().toISOString();
-        uProfile = {
+        // Federated accounts do not come with a phone number: it is left empty and the user is asked
+        // for it in their profile. A made-up number is never stored.
+        const phone = fbUser.phoneNumber ? normalizePhoneNumber(fbUser.phoneNumber) : '';
+        const newProfile: UserProfile = {
           uid,
-          name: res.user.displayName || 'Apple Rider',
-          phone: res.user.phoneNumber || '+27 82 000 0000',
-          email: res.user.email || '',
-          photoURL: res.user.photoURL || '',
+          name: fbUser.displayName || defaultName,
+          phone,
+          email: (fbUser.email || '').trim().toLowerCase(),
+          photoURL: fbUser.photoURL || '',
           role: assignedRole,
           roles: [assignedRole],
           activeRole: assignedRole,
+          emailVerified: true,
           status: 'active',
           accountStatus: 'active',
           createdAt: now,
           updatedAt: now,
         };
-        await firestoreService.createUserProfile(uProfile);
+        await firestoreService.createUserProfile(newProfile);
 
         if (assignedRole === 'passenger') {
-          const pProf: PassengerProfile = {
+          await firestoreService.createOrUpdatePassenger({
             userId: uid,
-            name: uProfile.name,
-            phone: uProfile.phone,
+            name: newProfile.name,
+            phone,
             rating: 5.0,
             totalTrips: 0,
-            walletBalance: 50.0,
+            walletBalance: 0,
             savedPlaces: [],
             createdAt: now,
             updatedAt: now,
-          };
-          await firestoreService.createOrUpdatePassenger(pProf);
-          setPassengerProfile(pProf);
-          setDriverProfile(null);
-        } else if (assignedRole === 'driver') {
-          const dProf: DriverProfile = {
+          });
+        } else {
+          await firestoreService.createOrUpdateDriver({
             userId: uid,
-            name: uProfile.name,
-            phone: uProfile.phone,
-            photoURL: uProfile.photoURL,
+            name: newProfile.name,
+            phone,
+            photoURL: newProfile.photoURL,
             rating: 5.0,
             totalTrips: 0,
             online: false,
@@ -903,43 +900,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             totalEarnings: 0,
             createdAt: now,
             updatedAt: now,
-          };
-          await firestoreService.createOrUpdateDriver(dProf);
-          setDriverProfile(dProf);
-          setPassengerProfile(null);
-        }
-      } else {
-        if (uProfile.role === 'passenger' || (!uProfile.role && !uProfile.roles?.includes('driver'))) {
-          const pProfile = await firestoreService.getPassengerProfile(uid);
-          setPassengerProfile(pProfile);
-        }
-        if (uProfile.role === 'driver' || uProfile.roles?.includes('driver')) {
-          const dProfile = await firestoreService.getDriverProfile(uid);
-          setDriverProfile(dProfile);
+          });
         }
       }
 
-      setCurrentUser(res.user);
-      setUserProfile(uProfile);
-      const targetRole: UserRole = isRiderTarget
-        ? 'passenger'
-        : (uProfile.activeRole || uProfile.role || preferredRole || 'passenger');
-      setRawActiveRole(targetRole);
+      setCurrentUser(fbUser);
+      await fetchProfiles(uid, fbUser);
 
       if (isRiderTarget) {
         notificationService.registerNativePush(uid).catch(() => {});
       }
     } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
-        console.log('Apple Sign In was dismissed by user.');
-      } else {
-        console.error('Apple Sign In error:', err);
+      const cancelled =
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        /cancel/i.test(String(err?.message || ''));
+      if (cancelled) {
+        console.log(`${label} Sign In was dismissed by user.`);
+        throw new Error('Sign-in cancelled.');
       }
+      console.error(`${label} Sign In error:`, err);
       throw new Error(getReadableAuthError(err));
     } finally {
+      isSigningInRef.current = false;
       setLoading(false);
     }
   };
+
+  const signInWithGoogle = (preferredRole: UserRole = 'passenger') =>
+    signInWithProvider('google.com', preferredRole, 'ZAKA User');
+
+  const signInWithApple = (preferredRole: UserRole = 'passenger') =>
+    signInWithProvider('apple.com', preferredRole, 'ZAKA User');
 
   const deleteAccount = async () => {
     if (!auth.currentUser) {
@@ -948,6 +940,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const uid = auth.currentUser.uid;
     setLoading(true);
     try {
+      // 0. Remove verification documents held in Cloud Storage (only the owner may delete them)
+      const storedDocs = Object.values(driverProfile?.verificationDocuments || {});
+      await Promise.all(
+        storedDocs
+          .filter((d): d is NonNullable<typeof d> => Boolean(d?.storagePath))
+          .map((d) => storageService.deleteDocument(d.storagePath))
+      );
       // 1. Delete or anonymize profile data in Firestore
       await firestoreService.deleteOrAnonymizeUserProfile(uid);
       // 2. Delete the user from Firebase Auth
@@ -1041,6 +1040,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Dispatch Firebase email verification link immediately
       try {
         await sendEmailVerification(fbUser);
+        setVerificationEmailSent(true);
         console.log('[ZAKA AUTH] verification-email-dispatched to', cleanEmail);
       } catch (eErr) {
         console.warn('Note sending initial verification email:', eErr);
@@ -1100,7 +1100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Check phone uniqueness against global phone index
     const phoneCheck = await firestoreService.checkPhoneRegistered(normalizedPhone);
-    if (phoneCheck.isRegistered && phoneCheck.uid && phoneCheck.uid !== uid) {
+    if (phoneCheck.isRegistered && !phoneCheck.isOwn) {
       throw new Error('This phone number is already registered with ZAKA. Please log in to your existing account.');
     }
 
@@ -1154,16 +1154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       phone: normalizedPhone,
       rating: 5.0,
       totalTrips: 0,
-      walletBalance: 50.0,
-      savedPlaces: [
-        {
-          id: 'sp-home',
-          label: 'Home',
-          address: '42 Oxford Road, Rosebank, Johannesburg',
-          location: { latitude: -26.1458, longitude: 28.0416 },
-          icon: 'home',
-        },
-      ],
+      walletBalance: 0,
+      savedPlaces: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -1229,7 +1221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const normalizedPhone = phoneVal.normalized;
 
         const phoneCheck = await firestoreService.checkPhoneRegistered(normalizedPhone);
-        if (phoneCheck.isRegistered && (!auth.currentUser || phoneCheck.uid !== auth.currentUser.uid)) {
+        if (phoneCheck.isRegistered && !phoneCheck.isOwn) {
           throw new Error('This phone number is already registered. Please sign in instead.');
         }
 
@@ -1289,9 +1281,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // ignore
         }
 
-        const isAdminEmail = ADMIN_EMAILS.includes(cleanEmail);
-        const assignedRoles: UserRole[] = isAdminEmail ? ['admin'] : ['driver'];
-        const activeRole: UserRole = isAdminEmail ? 'admin' : 'driver';
+        // Registration always produces a Driver. Admin is never granted by the sign-up form.
+        const assignedRoles: UserRole[] = ['driver'];
+        const activeRole: UserRole = 'driver';
 
         const newUserProfile: UserProfile = {
           uid: fbUser.uid,
@@ -1302,7 +1294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: activeRole,
           roles: assignedRoles,
           activeRole,
-          emailVerified: Boolean(fbUser.emailVerified || isAdminEmail),
+          emailVerified: Boolean(fbUser.emailVerified),
           status: 'active',
           accountStatus: 'active',
           createdAt: now,
@@ -1373,6 +1365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPassengerProfile(null);
         setDriverProfile(resolvedDriverProfile);
         setRawActiveRole('driver');
+        rememberRole(fbUser.uid, 'driver');
         setCurrentUser(fbUser);
       }
     } catch (err: any) {
@@ -1386,38 +1379,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserProfileData = async (data: Partial<UserProfile>) => {
     if (!userProfile?.uid) return;
-    const updated = {
-      ...userProfile,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
-    await firestoreService.createUserProfile(updated);
-    setUserProfile(updated);
+    const uid = userProfile.uid;
+    const changes: Partial<UserProfile> = { ...data };
+
+    // Phone numbers are always stored in canonical form (+27821234567) and reserved for one account
+    if (typeof changes.phone === 'string') {
+      const phoneVal = validatePhoneNumber(changes.phone);
+      if (!phoneVal.valid) {
+        throw new Error(phoneVal.error || 'Please enter a valid South African mobile number.');
+      }
+      changes.phone = phoneVal.normalized;
+      const previous = userProfile.phone ? normalizePhoneNumber(userProfile.phone) : '';
+      if (changes.phone !== previous) {
+        const check = await firestoreService.checkPhoneRegistered(changes.phone);
+        if (check.isRegistered && !check.isOwn) {
+          throw new Error('This phone number is already registered to another ZAKA account.');
+        }
+        await firestoreService.claimPhoneIndex(changes.phone, uid);
+        if (previous) {
+          await firestoreService.releasePhoneIndex(previous, uid);
+        }
+      }
+    }
+
+    // Only the changed fields are written: role, roles and verification flags are never re-sent
+    await firestoreService.updateUserProfile(uid, changes);
+    setUserProfile((prev) => (prev ? { ...prev, ...changes, updatedAt: new Date().toISOString() } : prev));
   };
 
   const updatePassengerProfileData = async (data: Partial<PassengerProfile>) => {
     if (!passengerProfile?.userId) return;
-    const updated = {
-      ...passengerProfile,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
-    await firestoreService.createOrUpdatePassenger(updated);
-    setPassengerProfile(updated);
+    // The wallet balance belongs to the backend and is never written from the app
+    const { walletBalance: _serverOwned, ...changes } = data;
+    if (typeof changes.phone === 'string') {
+      changes.phone = normalizePhoneNumber(changes.phone);
+    }
+    await firestoreService.updatePassengerFields(passengerProfile.userId, changes);
+    setPassengerProfile((prev) => (prev ? { ...prev, ...changes, updatedAt: new Date().toISOString() } : prev));
   };
 
   const updateDriverProfileData = async (data: Partial<DriverProfile>) => {
     if (!driverProfile?.userId) return;
-    const updated = {
-      ...driverProfile,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
-    await firestoreService.createOrUpdateDriver(updated);
-    setDriverProfile(updated);
+    const changes: Partial<DriverProfile> = { ...data };
+    if (typeof changes.phone === 'string') {
+      changes.phone = normalizePhoneNumber(changes.phone);
+    }
+    // Only the edited fields are written; approval, rating and earnings fields are admin / backend owned
+    await firestoreService.updateDriverFields(driverProfile.userId, changes);
+    setDriverProfile((prev) => (prev ? { ...prev, ...changes, updatedAt: new Date().toISOString() } : prev));
   };
 
   const signInDemoPersona = async (personaKey: 'amara' | 'sipho' | 'kofi' | 'chidi') => {
+    if (!DEMO_MODE_ENABLED) {
+      throw new Error(DEMO_DISABLED_MESSAGE);
+    }
     setLoading(true);
     isSigningInDemoRef.current = true;
     try {
@@ -1441,7 +1456,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userCredential = await signInAnonymously(auth);
       } catch (authErr: any) {
         console.warn('signInAnonymously unavailable, using dedicated demo credential:', authErr.code);
-        if (DEMO_IDENTITIES[personaKey]) {
+        if (DEMO_IDENTITIES[personaKey] && DEMO_ACCOUNT_PASSWORD) {
           userCredential = await signInWithEmailAndPassword(
             auth,
             DEMO_IDENTITIES[personaKey].email,
@@ -1540,6 +1555,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchDemoTestPersona = async (targetPersona: 'amara' | 'sipho') => {
+    if (!DEMO_MODE_ENABLED || !DEMO_ACCOUNT_PASSWORD) {
+      throw new Error(DEMO_DISABLED_MESSAGE);
+    }
     setLoading(true);
     isSigningInDemoRef.current = true;
     try {
@@ -1659,6 +1677,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const startDemoTestMode = async (initialPersona: 'amara' | 'sipho' = 'amara') => {
+    if (!isDemoEnabled) {
+      console.warn('[ZAKA] Demo mode is disabled. Set VITE_ENABLE_DEMO_MODE=true to enable.');
+      return;
+    }
     setIsDemoTestMode(true);
     try {
       sessionStorage.setItem('zaka_demo_test_mode', 'true');
@@ -1669,6 +1691,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetDemoRide = async () => {
+    if (!DEMO_MODE_ENABLED) return;
     try {
       if (activeDemoRideId) {
         const ride = await firestoreService.getRide(activeDemoRideId);

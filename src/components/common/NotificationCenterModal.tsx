@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NotificationRecord } from '../../types';
 import { firestoreService } from '../../firebase/firestoreService';
 import { notificationService } from '../../services/notificationService';
@@ -97,7 +98,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
   const fcmStatus = notificationService.getPushNotificationStatus();
 
-  return (
+  // Rendered on <body>: the header's backdrop blur would otherwise trap this fixed overlay inside the header bar
+  return createPortal(
     <div
       id="notification-center-modal"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-xs animate-in fade-in duration-150"
@@ -268,6 +270,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           <span className="text-[10px] text-neutral-400">Push (FCM) Ready</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

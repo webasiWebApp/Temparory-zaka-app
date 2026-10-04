@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export const VerifyEmailScreen: React.FC = () => {
-  const { currentUser, userProfile, sendVerificationEmail, checkEmailVerification, signOut } = useAuth();
+  const { currentUser, userProfile, verificationEmailSent, sendVerificationEmail, checkEmailVerification, signOut } = useAuth();
   const [isChecking, setIsChecking] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -36,6 +36,42 @@ export const VerifyEmailScreen: React.FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  // Send the link automatically when the user lands here without one having been sent in this
+  // session (sign-in with an unverified account, recovered registration, or a failed initial send).
+  useEffect(() => {
+    const uid = currentUser?.uid;
+    if (!uid || verificationEmailSent) return;
+    const key = `zaka_verify_email_sent_${uid}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // sessionStorage unavailable: fall through and send once per mount
+    }
+    setIsSending(true);
+    sendVerificationEmail()
+      .then(() => {
+        setResendCooldown(60);
+        setFeedback({
+          type: 'success',
+          message: 'Verification email sent to ' + email + '. Please check your inbox and spam folder.',
+        });
+      })
+      .catch((err: any) => {
+        try {
+          sessionStorage.removeItem(key);
+        } catch {
+          // ignore
+        }
+        setFeedback({
+          type: 'error',
+          message: err?.message || 'Failed to send verification email. Please use the resend button below.',
+        });
+      })
+      .finally(() => setIsSending(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid]);
 
   const handleCheckStatus = async () => {
     setIsChecking(true);

@@ -56,6 +56,15 @@ export const ActiveRidePanel: React.FC<ActiveRidePanelProps> = ({
   const [searchElapsedSec, setSearchElapsedSec] = useState<number>(0);
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
 
+  // Safety PIN: read from the passenger-only private document of this ride
+  const [safetyPin, setSafetyPin] = useState<string | null>(ride.otp || null);
+  useEffect(() => {
+    const unsubscribe = firestoreService.listenToRidePin(ride.id, (pin) => {
+      setSafetyPin(pin || ride.otp || null);
+    });
+    return () => unsubscribe();
+  }, [ride.id, ride.otp]);
+
   useEffect(() => {
     if (ride.status !== 'searching') return;
 
@@ -297,7 +306,7 @@ export const ActiveRidePanel: React.FC<ActiveRidePanelProps> = ({
                 </span>
               </div>
               <div className="rounded-xl bg-neutral-900 px-3 py-1 font-mono text-sm font-black tracking-widest text-[#FF7A00] shadow-xs">
-                {ride.otp || '8492'}
+                {safetyPin || '••••'}
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "zaka-e-hailing",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,12 +9,13 @@
     "build:web": "VITE_APP_TARGET=web vite build",
     "build:rider-ios": "VITE_APP_TARGET=rider-ios vite build && npx cap sync ios",
     "cap:sync": "npx cap sync ios",
-    "start": "node server.ts",
+    "start": "NODE_ENV=production tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit && tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --target es2022 --lib es2022,dom --strict --resolveJsonModule --types node server.ts"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.5.2",
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.2",
@@ -38,6 +39,7 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "tsx": "^4.23.15",
     "vite": "^6.2.3"
   },
   "devDependencies": {
@@ -49,7 +51,6 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.2",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.23.13",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
   }

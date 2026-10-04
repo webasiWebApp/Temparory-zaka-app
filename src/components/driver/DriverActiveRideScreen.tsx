@@ -89,10 +89,12 @@ export const DriverActiveRideScreen: React.FC<DriverActiveRideScreenProps> = ({
 
   // 3. Action: Start Ride (driver_arrived -> in_progress)
   const handleStartRide = async () => {
-    if (pinInput && pinInput.trim() !== ride.otp) {
-      setPinError('Invalid Safety PIN. Please ask the passenger for their 4-digit code.');
+    if (!pinInput || pinInput.trim().length !== 4) {
+      setPinError('Safety PIN is required. Ask the passenger for their 4-digit code.');
       return;
     }
+    // The driver app does not know the PIN. It is checked by the backend security rules when the
+    // trip start is submitted, so it cannot be skipped or guessed from the device.
     setPinError('');
     setIsProcessing(true);
     try {
