@@ -724,6 +724,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return 'Sign-in cancelled.';
       case 'auth/popup-blocked':
         return 'Sign-in popup was blocked by your browser. Please allow popups or use Demo accounts.';
+      case 'auth/unauthorized-domain':
+        return `Sign-in is not enabled for ${window.location.hostname} yet. This domain must be added under Firebase Authentication > Settings > Authorized domains.`;
       case 'auth/operation-not-allowed':
         return 'Email/Password sign-in is not enabled. Please contact support or use Google Sign-In.';
       case 'permission-denied':

@@ -19,16 +19,6 @@ export const ZakaWelcomeScreen: React.FC<ZakaWelcomeScreenProps> = ({
 }) => {
   return (
     <div className="relative flex-1 flex flex-col w-full h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#0A0A0A] select-none">
-      {/* 1. Cinematic Visual Background (Static) */}
-      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-        <img
-          src="/src/assets/images/zaka_cyber_backdrop_1790488087552.jpg"
-          alt="ZAKA - People Move Africa"
-          referrerPolicy="no-referrer"
-          className="w-full h-full object-cover object-center pointer-events-none"
-        />
-      </div>
-
       {/* 2. Atmospheric Orange Horizon Glow (Static) */}
       <div className="absolute inset-y-0 left-0 w-3/4 sm:w-2/3 bg-[radial-gradient(ellipse_at_0%_45%,_rgba(255,122,0,0.36)_0%,_rgba(255,100,0,0.12)_45%,_transparent_80%)] pointer-events-none mix-blend-screen opacity-35" />
       
