@@ -42,21 +42,6 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary animate-pulse font-bold text-xl">
-            Z
-          </div>
-          <p className="text-xs font-semibold text-ink-3 tracking-wide uppercase">
-            Loading ZAKA...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const handleOpenAuth = (mode: 'signin' | 'signup' | 'forgot' = 'signin', role?: UserRole) => {
     setAuthConfig({
       isOpen: true,
@@ -92,6 +77,32 @@ const AppContent: React.FC = () => {
   const handleCloseHistory = () => {
     setIsHistoryOpen(false);
   };
+
+  // The dialogs below stay mounted while the session loads, so a failed sign-in keeps its error message
+  // instead of the auth dialog re-opening blank.
+  if (loading) {
+    return (
+      <div className="flex h-[100dvh] min-h-[100dvh] flex-col bg-white font-sans antialiased text-ink select-none overflow-hidden w-full">
+        <div key="content" className="flex flex-1 items-center justify-center bg-white">
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary animate-pulse font-bold text-xl">
+              Z
+            </div>
+            <p className="text-xs font-semibold text-ink-3 tracking-wide uppercase">
+              Loading ZAKA...
+            </p>
+          </div>
+        </div>
+        <AuthModal
+          key="auth"
+          isOpen={authConfig.isOpen}
+          initialMode={authConfig.mode}
+          initialRole={authConfig.role}
+          onClose={handleCloseAuth}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] flex-col bg-white font-sans antialiased text-ink select-none overflow-hidden w-full">
@@ -138,6 +149,7 @@ const AppContent: React.FC = () => {
 
       {/* Auth, Profile & History Dialogs */}
       <AuthModal
+        key="auth"
         isOpen={authConfig.isOpen}
         initialMode={authConfig.mode}
         initialRole={authConfig.role}
