@@ -536,6 +536,9 @@ app.post('/api/driver/upload-document', rateLimit(60000, 5), async (req: Request
       'vehicle-inspection',
       'profile-photo',
       'operating-license',
+      'id-document',
+      'proof-of-address',
+      'proof-of-ownership',
     ];
     if (!allowedDocumentTypes.includes(documentType)) {
       res.status(400).json({ success: false, error: 'Unknown document type.' });
@@ -612,6 +615,9 @@ app.post('/api/driver/upload-document', rateLimit(60000, 5), async (req: Request
       'vehicle-inspection': 'vehicleInspection',
       'profile-photo': 'profilePhoto',
       'operating-license': 'operatingLicense',
+      'id-document': 'idDocument',
+      'proof-of-address': 'proofOfAddress',
+      'proof-of-ownership': 'proofOfOwnership',
     };
 
     const titles: Record<string, string> = {
@@ -621,6 +627,9 @@ app.post('/api/driver/upload-document', rateLimit(60000, 5), async (req: Request
       'vehicle-inspection': 'Vehicle Roadworthy Inspection Certificate',
       'profile-photo': 'Driver Profile Photo',
       'operating-license': 'Operating Licence / PRE Permit',
+      'id-document': 'ID Document',
+      'proof-of-address': 'Proof of Address',
+      'proof-of-ownership': 'Proof of Vehicle Ownership',
     };
 
     const docField = keyMap[documentType] || documentType;
@@ -842,6 +851,8 @@ async function purgeUserData(uid: string): Promise<void> {
   await removeAll(collection(db, 'users', uid, 'recentDestinations'));
   await removeAll(query(collection(db, 'phoneIndex'), where('uid', '==', uid), limit(20)));
   await removeAll(collection(db, 'drivers', uid, 'documents'));
+  // Driver's personal details (home address, date of birth, nationality, ID number)
+  await removeAll(collection(db, 'drivers', uid, 'private'));
   // Passenger identity verification photos (ID document and live photo)
   await removeAll(collection(db, 'passengers', uid, 'verification'));
   await removeAll(collection(db, 'driverCompliance', uid, 'documents'));

@@ -26,9 +26,12 @@ import {
   Sparkles,
   Camera,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
-import { VehicleType, ACTIVE_VEHICLE_TYPES } from '../../types';
+import { VehicleType, ACTIVE_VEHICLE_TYPES, DriverPrivateDetails } from '../../types';
+import { firestoreService } from '../../firebase/firestoreService';
 import { isRiderTarget } from '../../config/appTarget';
+import { maskIdNumber } from '../../utils/identityUtils';
 import { apiFetch } from '../../services/apiClient';
 import { validatePhoneNumber as validateZakaPhone, formatPhoneDisplay, normalizePhoneNumber } from '../../utils/phoneUtils';
 import { ownPhotoURL, imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
@@ -47,11 +50,6 @@ function readableSaveError(err: any): string {
     return 'We could not save your changes. Please check your connection and try again.';
   }
   return msg;
-}
-
-/** Shows only the last four characters of an ID number */
-function maskIdNumber(idNumber: string): string {
-  return idNumber.length > 4 ? `${'•'.repeat(idNumber.length - 4)}${idNumber.slice(-4)}` : idNumber;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
@@ -86,12 +84,33 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [photoURL, setPhotoURL] = useState(ownPhotoURL(userProfile?.photoURL));
   const photoInputRef = React.useRef<HTMLInputElement | null>(null);
   const [changingPhone, setChangingPhone] = useState(false);
+  // Driver's private details (home address, identity): only this driver and Admin can read them
+  const [driverDetails, setDriverDetails] = useState<DriverPrivateDetails | null>(null);
+
+  React.useEffect(() => {
+    if (!isOpen || activeRole !== 'driver' || !userProfile?.uid) return;
+    let cancelled = false;
+    firestoreService
+      .getDriverPrivateDetails(userProfile.uid)
+      .then((d) => {
+        if (!cancelled) setDriverDetails(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeRole, userProfile?.uid]);
 
   const isPassenger = activeRole === 'passenger';
   const isDriver = activeRole === 'driver';
-  // Identity details are fixed once a passenger has submitted them for verification
+  // Identity details are fixed once a passenger has submitted them for verification,
+  // and once a driver has submitted their application details
   const identityLocked =
-    isPassenger && ['pending', 'approved'].includes(passengerProfile?.verificationStatus || '');
+    (isPassenger && ['pending', 'approved'].includes(passengerProfile?.verificationStatus || '')) ||
+    (isDriver && Boolean(driverProfile?.detailsSubmittedAt));
+  // A driver's contact number and vehicle are part of their verified record: fixed after registration
+  const driverPhoneLocked = isDriver && Boolean(userProfile?.phone);
+  const vehicleLocked = Boolean(driverProfile?.vehicle?.registrationNumber);
 
   // Driver Vehicle form states
   const [vehicleMake, setVehicleMake] = useState(driverProfile?.vehicle?.make || '');
@@ -208,7 +227,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     setError('');
 
     // A passenger's number only changes through SMS verification (see "Change number")
-    const phoneEditable = !isPassenger;
+    const phoneEditable = !isPassenger && !driverPhoneLocked;
     let trimmedPhone = '';
     if (phoneEditable && (phone.trim() || isDriver)) {
       const phoneCheck = validateZakaPhone(phone);
@@ -241,21 +260,27 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           await updatePassengerProfileData({ name: trimmedName });
         }
       } else if (activeRole === 'driver') {
+        // Only what the driver may still change is sent: a registered vehicle and phone number are fixed
+        const vehicleEntered = Boolean(vehicleMake.trim() && vehicleModel.trim() && vehicleColour.trim() && vehiclePlate.trim());
         await updateDriverProfileData({
-          name: trimmedName,
-          phone: trimmedPhone,
+          ...(identityLocked ? {} : { name: trimmedName }),
+          ...(trimmedPhone ? { phone: trimmedPhone } : {}),
           photoURL,
-          vehicle: {
-            driverId: userProfile?.uid || '',
-            make: vehicleMake,
-            model: vehicleModel,
-            colour: vehicleColour,
-            registrationNumber: vehiclePlate,
-            vehicleType,
-            passengerCapacity: vehicleType === 'xl' ? 6 : 4,
-            // Vehicle approval is decided by ZAKA Admin, never by the driver's own profile form
-            status: driverProfile?.vehicle?.status || 'pending',
-          },
+          ...(!vehicleLocked && vehicleEntered
+            ? {
+                vehicle: {
+                  driverId: userProfile?.uid || '',
+                  make: vehicleMake.trim(),
+                  model: vehicleModel.trim(),
+                  colour: vehicleColour.trim(),
+                  registrationNumber: vehiclePlate.trim().toUpperCase(),
+                  vehicleType,
+                  passengerCapacity: vehicleType === 'xl' ? 6 : 4,
+                  // Vehicle approval is decided by ZAKA Admin, never by the driver's own profile form
+                  status: driverProfile?.vehicle?.status || 'pending',
+                },
+              }
+            : {}),
         });
       }
 
@@ -517,9 +542,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full rounded-input border border-line bg-surface-2 p-3 text-xs text-ink focus:border-primary focus:outline-none"
+                    disabled={driverPhoneLocked}
+                    className={`w-full rounded-input border border-line p-3 text-xs focus:border-primary focus:outline-none ${
+                      driverPhoneLocked ? 'bg-[#EEEEEE] text-ink-3 cursor-not-allowed' : 'bg-surface-2 text-ink'
+                    }`}
                     required={isDriver}
                   />
+                  {isDriver && (
+                    <p className="mt-1 text-[11px] text-ink-3">
+                      {driverPhoneLocked
+                        ? 'Your phone number and email address are fixed after registration. Contact ZAKA support to change them.'
+                        : 'Check this number carefully: it cannot be changed after you save it.'}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -532,6 +567,45 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   className="w-full rounded-input border border-line bg-[#EEEEEE] p-3 text-xs text-ink-3 cursor-not-allowed"
                 />
               </div>
+
+              {/* Driver's personal details: private to the driver and Admin, managed on the application page */}
+              {isDriver && (
+                <div className="rounded-card border border-line bg-surface-2 p-3 space-y-2">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-ink">
+                    <Shield className="h-3.5 w-3.5 text-primary-text" />
+                    Personal Details
+                  </span>
+                  {driverDetails ? (
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                      <div className="col-span-2">
+                        <dt className="text-[11px] text-ink-3">Home Address</dt>
+                        <dd className="font-bold text-ink">{driverDetails.homeAddress || '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] text-ink-3">Date of Birth</dt>
+                        <dd className="font-bold text-ink">{(driverDetails.dateOfBirth || '').replace(/-/g, '/') || '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] text-ink-3">Gender</dt>
+                        <dd className="font-bold capitalize text-ink">{driverDetails.gender || '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] text-ink-3">Nationality</dt>
+                        <dd className="font-bold text-ink">{driverDetails.nationality || '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] text-ink-3">ID / Passport Number</dt>
+                        <dd className="font-mono font-bold text-ink">{driverDetails.idNumber ? maskIdNumber(driverDetails.idNumber) : '—'}</dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="text-xs text-ink-2">Not provided yet.</p>
+                  )}
+                  <p className="text-[11px] text-ink-3">
+                    Only you and ZAKA Admin can see these details. Add them or update your home address under Application in the driver console.
+                  </p>
+                </div>
+              )}
 
               {/* Passenger identity details: shown for reference, never editable after registration */}
               {isPassenger && passengerProfile?.dateOfBirth && (
@@ -594,7 +668,38 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           {activeTab === 'places' && <SavedPlacesEditor />}
 
           {/* TAB 3: DRIVER VEHICLE DETAILS */}
-          {activeTab === 'vehicle' && (
+          {activeTab === 'vehicle' && vehicleLocked && (
+            <div className="space-y-3">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-3 rounded-card border border-line bg-surface-2 p-4 text-xs">
+                <div>
+                  <dt className="text-[11px] text-ink-3">Make</dt>
+                  <dd className="font-bold text-ink">{driverProfile?.vehicle?.make || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Model</dt>
+                  <dd className="font-bold text-ink">{driverProfile?.vehicle?.model || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Colour</dt>
+                  <dd className="font-bold text-ink">{driverProfile?.vehicle?.colour || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Licence Plate</dt>
+                  <dd className="font-mono font-bold text-ink">{driverProfile?.vehicle?.registrationNumber}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Vehicle Class</dt>
+                  <dd className="font-bold uppercase text-ink">{driverProfile?.vehicle?.vehicleType}</dd>
+                </div>
+              </dl>
+              <p className="flex items-start gap-1.5 text-[11px] text-ink-3">
+                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Vehicle details are fixed after registration to keep your verified vehicle record accurate. To register a different vehicle, contact ZAKA support.
+              </p>
+            </div>
+          )}
+
+          {activeTab === 'vehicle' && !vehicleLocked && (
             <form onSubmit={handleSaveProfile} className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -676,6 +781,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 <Save className="h-4 w-4" />
                 <span>Save Vehicle Specs</span>
               </button>
+              <p className="text-[11px] text-ink-3">
+                Check these details carefully: they cannot be changed after you save them.
+              </p>
             </form>
           )}
 

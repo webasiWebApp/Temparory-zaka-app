@@ -1,94 +1,86 @@
-# ZAKA App Testing Report
+# ZAKA Driver App Testing Report — Driver-Only Items
 
-Passenger registration, account settings, ride booking, map behaviour and interface issues.
+Items already covered in the passenger checklist have been removed. Original item numbers are kept.
 
 ---
 
-## 1. Passenger Issues
+## 1. Driver Registration and Application Process
 
-### A. Sign-In and Registration
+- [ ] **1. Missing Driver Application Page**
+  Drivers should complete an application process and submit supporting documents for verification and approval. This page is no longer visible in the app. Restore the driver application page and ensure the full process works.
 
-- [ ] **1. Google Sign-In**
-  When signing in with a Google account, the app automatically signs the user into a passenger account.
+- [ ] **2. Required Supporting Documents**
+  During registration, drivers must be able to upload the following documents:
+  - [ ] Vehicle registration documents
+  - [ ] Proof of vehicle ownership
+  - [ ] Professional Driving Permit (PDP)
+  - [ ] ID document
+  - [ ] Proof of address
 
-- [ ] **2. Phone Number Verification**
-  During passenger registration, the app does not verify the phone number using an OTP. It accepts any number entered.
-  Implement OTP verification.
+---
 
-- [ ] **3. Password Reset**
-  Password reset emails are being delivered to the recipient's spam folder. Review the email configuration to improve deliverability.
+## 2. Vehicle Information and Restrictions
 
-### B. Profile and Account Settings
+- [ ] **4. Restrict Vehicle Information Editing**
+  After registration, drivers must not be able to change the following vehicle information:
+  - [ ] Vehicle make
+  - [ ] Vehicle model
+  - [ ] Vehicle colour
+  - [ ] Licence plate number
+  - [ ] Vehicle class
 
-- [ ] **4. Favourite Locations — Map Pinning**
-  Passengers cannot pin or select saved favourite addresses on the map.
+  These details should remain fixed after registration to maintain accurate vehicle records and support the driver verification process.
 
-- [ ] **5. Favourite Locations — Data Persistence**
-  Saved favourite locations disappear after the passenger signs out and signs back in. These locations must remain saved to the user's account.
+---
 
-- [ ] **6. Profile Picture Selection**
-  The Account Settings page displays random people's photos for passengers to choose from. Remove this option.
+## 3. Driver Profile Information
 
-- [ ] **7. Driver Profile Picture**
-  Provide drivers with an option to upload their own profile picture during registration.
+- [ ] **5. Required Profile Fields**
+  Add the following fields to the driver profile:
+  - [ ] Home Address
 
-- [ ] **8. Profile Updates**
-  Updating profile information currently produces an error. Investigate and resolve this issue.
+- [ ] **6. Restrict Editing of Personal Information**
+  Drivers must not be able to change the following information after registration:
+  - [ ] Phone Number
+  - [ ] Email Address
 
-### C. Profile Information and Verification
-
-- [ ] **9. Required Profile Fields**
-  Add the following fields to the passenger profile:
-  - [ ] Date of Birth (YYYY/MM/DD)
-  - [ ] Gender (Male/Female)
-  - [ ] Nationality
-  - [ ] ID Number
-
-- [ ] **10. Restrict Profile Editing**
-  The following information must not be editable after registration:
-  - [ ] Name and Surname
+- [ ] **7. Protect Sensitive Information**
+  The following information must not be visible to passengers:
   - [ ] Date of Birth
-  - [ ] Gender
   - [ ] Nationality
   - [ ] ID Number
 
-- [ ] **11. Passenger Identity Verification**
-  During registration, passengers must be required to:
-  - [ ] Upload a photograph of their ID document.
-  - [ ] Take a live photo using the ZAKA app.
-  - [ ] Submit both images for verification and approval before being approved to use the service.
+  This information should only be accessible to authorised personnel for verification and administrative purposes.
 
 ---
 
-## 2. Ride Booking and Map Issues
+## 5. GPS and Location Issues
 
-- [ ] **12. Road Route Illustration**
-  After selecting a pickup location and destination, the map displays a straight line between the two points. Replace this with the actual road route to the destination.
-
-- [ ] **13. Ride Type Icons**
-  Replace the emojis currently used for the different ride types with simple, professional icons.
-
-- [ ] **14. Confirm Ride Button**
-  The Confirm Ride button does not work when clicked. Investigate and fix the functionality so passengers can confirm their bookings.
-
-- [ ] **15. Remove Moto Option**
-  Remove the Moto ride option from the available ride types.
-
-- [ ] **16. Map Design**
-  Change the map to a black-and-white style. Only the following elements should remain in colour:
-  - [ ] Pickup location
-  - [ ] Destination
-  - [ ] Route illustration
+- [ ] **10. Persistent GPS Warning**
+  The app repeatedly displays a "GPS Warning" message. Investigate the cause and resolve the issue to ensure the driver's location is detected accurately and consistently.
 
 ---
 
-## 3. Navigation and User Interface
+## Priority Summary
 
-- [ ] **17. ZAKA Logo Navigation**
-  When a user clicks the ZAKA logo/icon, the app should navigate back to the Home page.
+**HIGH PRIORITY**
+Restore driver application and document submission; resolve GPS Warning; restrict changes to verified personal and vehicle information; hide sensitive information from passengers.
 
-- [ ] **18. Notifications Popup**
-  After clicking Notifications, the popup remains visible even when the user clicks elsewhere on the screen. Make the popup close automatically when the user clicks outside it.
+**MEDIUM PRIORITY**
+Add required profile fields.
+
+**UI / DESIGN**
+Ensure the driver interface is consistent and functional.
 
 ---
 
+## Removed (already in the passenger checklist)
+
+- 3. Driver Identity Verification (same as passenger #11)
+- 5. Required Profile Fields — Date of Birth, Gender, Nationality, ID Number (same as passenger #9)
+- 6. Restrict Editing — Full Name, Nationality, Date of Birth, Gender, ID Number (same as passenger #10)
+- 8. Remove Random Profile Picture Selection (same as passenger #6)
+- 9. Enable Driver Profile Picture Upload (same as passenger #7)
+- 11. ZAKA Logo Navigation (same as passenger #17)
+- 12. Map Design (same as passenger #16)
+- 13. Notifications Popup (same as passenger #18)

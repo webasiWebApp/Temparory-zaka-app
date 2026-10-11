@@ -22,6 +22,8 @@ import {
   PricingConfig,
   DriverDocumentType,
   DriverDocumentRecord,
+  DriverPrivateDetails,
+  DRIVER_DOCUMENT_FIELD_KEYS,
   DocumentStatus,
   AdminAuditRecord,
 } from '../../types';
@@ -117,6 +119,28 @@ export const AdminDashboard: React.FC = () => {
   // Driver Verification Console & Audit State
   const [auditLogs, setAuditLogs] = useState<AdminAuditRecord[]>([]);
   const [selectedDriverForReview, setSelectedDriverForReview] = useState<DriverProfile | null>(null);
+  // Private details of the driver under review (home address, date of birth, nationality, ID number)
+  const [reviewDriverDetails, setReviewDriverDetails] = useState<DriverPrivateDetails | null | 'loading'>(null);
+  const reviewDriverId = selectedDriverForReview?.userId || '';
+  useEffect(() => {
+    if (!reviewDriverId) {
+      setReviewDriverDetails(null);
+      return;
+    }
+    let cancelled = false;
+    setReviewDriverDetails('loading');
+    firestoreService
+      .getDriverPrivateDetails(reviewDriverId)
+      .then((d) => {
+        if (!cancelled) setReviewDriverDetails(d);
+      })
+      .catch(() => {
+        if (!cancelled) setReviewDriverDetails(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewDriverId]);
   const [driverStatusFilter, setDriverStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
   const [rejectDriverModal, setRejectDriverModal] = useState<{
@@ -354,15 +378,7 @@ export const AdminDashboard: React.FC = () => {
 
       // Update local state for modal
       if (selectedDriverForReview?.userId === driverId) {
-        const keyMap: Record<DriverDocumentType, string> = {
-          'drivers-license': 'driversLicense',
-          'prdp': 'prdp',
-          'vehicle-registration': 'vehicleRegistration',
-          'vehicle-inspection': 'vehicleInspection',
-          'profile-photo': 'profilePhoto',
-          'operating-license': 'operatingLicense',
-        };
-        const field = keyMap[docType];
+        const field = DRIVER_DOCUMENT_FIELD_KEYS[docType];
         setSelectedDriverForReview((prev) => {
           if (!prev) return null;
           const currentDocs: any = prev.verificationDocuments || {};
@@ -1750,6 +1766,41 @@ export const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
+            {/* Personal details: private record, never shown to passengers */}
+            <div className="rounded-card border border-line bg-surface-2 p-3.5 text-xs space-y-2">
+              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                Personal Details (Admin only)
+              </span>
+              {reviewDriverDetails === 'loading' ? (
+                <p className="text-ink-3 italic">Loading...</p>
+              ) : reviewDriverDetails ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-ink">
+                  <div className="col-span-2 sm:col-span-4">
+                    <span className="text-neutral-400 block text-[11px]">Home Address</span>
+                    <span className="font-bold">{reviewDriverDetails.homeAddress || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[11px]">Date of Birth</span>
+                    <span className="font-bold">{(reviewDriverDetails.dateOfBirth || '').replace(/-/g, '/') || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[11px]">Gender</span>
+                    <span className="font-bold capitalize">{reviewDriverDetails.gender || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[11px]">Nationality</span>
+                    <span className="font-bold">{reviewDriverDetails.nationality || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[11px]">ID / Passport Number</span>
+                    <span className="font-mono font-bold">{reviewDriverDetails.idNumber || '—'}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-ink-3 italic">The driver has not submitted their personal details yet.</p>
+              )}
+            </div>
+
             {/* Vehicle Details Card */}
             <div className="rounded-card border border-line bg-surface-2 p-3.5 text-xs space-y-2">
               <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
@@ -1767,7 +1818,10 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-neutral-400 block text-[11px]">Colour / Year</span>
-                    <span className="font-bold">{selectedDriverForReview.vehicle.colour} ({selectedDriverForReview.vehicle.year})</span>
+                    <span className="font-bold">
+                      {selectedDriverForReview.vehicle.colour}
+                      {selectedDriverForReview.vehicle.year ? ` (${selectedDriverForReview.vehicle.year})` : ''}
+                    </span>
                   </div>
                   <div>
                     <span className="text-neutral-400 block text-[11px]">Category</span>
@@ -1790,16 +1844,30 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* 5 Compliance Documents Checklist */}
+            {/* Compliance Documents Checklist */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
-                  Required Compliance Documents (5/5)
+                  Required Supporting Documents
                 </h4>
                 <span className="text-[11px] text-ink-3">Audit & verification checklist</span>
               </div>
 
               {[
+                {
+                  type: 'id-document' as DriverDocumentType,
+                  title: 'ID Document',
+                  fieldKey: 'idDocument' as const,
+                  category: 'Driver Identity',
+                  desc: 'RSA ID card / book, or passport with a valid permit',
+                },
+                {
+                  type: 'proof-of-address' as DriverDocumentType,
+                  title: 'Proof of Address',
+                  fieldKey: 'proofOfAddress' as const,
+                  category: 'Driver Identity',
+                  desc: 'Utility bill, bank statement or lease, not older than 3 months',
+                },
                 {
                   type: 'drivers-license' as DriverDocumentType,
                   title: "Driver's Licence Card (Code B/EB)",
@@ -1820,6 +1888,13 @@ export const AdminDashboard: React.FC = () => {
                   fieldKey: 'vehicleRegistration' as const,
                   category: 'Vehicle Documentation',
                   desc: 'NaTIS registered vehicle ownership/operator document',
+                },
+                {
+                  type: 'proof-of-ownership' as DriverDocumentType,
+                  title: 'Proof of Vehicle Ownership',
+                  fieldKey: 'proofOfOwnership' as const,
+                  category: 'Vehicle Documentation',
+                  desc: 'Registration in the driver\'s name, finance agreement or owner\'s letter',
                 },
                 {
                   type: 'vehicle-inspection' as DriverDocumentType,

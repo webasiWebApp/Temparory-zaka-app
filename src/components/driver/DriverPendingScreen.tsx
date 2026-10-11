@@ -1,16 +1,19 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * ZAKA E-Hailing Platform - Driver Verification & Document Upload Screen
- * Handles South African compliance documents (Driver's Licence, PrDP, RC1, Roadworthy Certificate)
- * with Firebase Storage uploads, file validations, progress bars, and status tracking.
+ * ZAKA E-Hailing Platform - Driver Application Page
+ * The driver's personal details, vehicle and supporting documents (ID, proof of address, Driver's
+ * Licence, PrDP, RC1, proof of ownership, Roadworthy Certificate) with upload progress and review status.
+ * Shown full screen until ZAKA Admin approves the driver, and under "Application" in the driver
+ * console afterwards.
  */
 
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { firestoreService } from '../../firebase/firestoreService';
 import { storageService, DOCUMENT_TITLES } from '../../firebase/storageService';
-import { DriverDocumentType, DriverDocumentRecord, DocumentStatus } from '../../types';
+import { DriverDocumentType, DriverDocumentRecord, DocumentStatus, DRIVER_DOCUMENT_FIELD_KEYS } from '../../types';
+import { DriverApplicationDetails } from './DriverApplicationDetails';
 import { resolveDocumentUrl, ResolvedDocument } from '../../utils/documentUtils';
 import {
   Clock,
@@ -49,6 +52,18 @@ const REQUIRED_DOCS: {
   category: 'Driver' | 'Vehicle';
 }[] = [
   {
+    type: 'id-document',
+    title: 'ID Document',
+    description: 'South African ID card (both sides), green ID book, or passport photo page with a valid permit.',
+    category: 'Driver',
+  },
+  {
+    type: 'proof-of-address',
+    title: 'Proof of Address',
+    description: 'Utility bill, bank statement or lease in your name, not older than 3 months.',
+    category: 'Driver',
+  },
+  {
     type: 'drivers-license',
     title: "Driver's Licence Card",
     description: 'Valid South African code B, EB, or higher driver licence card (front and back).',
@@ -63,7 +78,13 @@ const REQUIRED_DOCS: {
   {
     type: 'vehicle-registration',
     title: 'Vehicle Registration (RC1)',
-    description: 'NaTIS certificate of registration confirming vehicle ownership or lease authority.',
+    description: 'NaTIS certificate of registration (RC1) or the current licence disc for the vehicle.',
+    category: 'Vehicle',
+  },
+  {
+    type: 'proof-of-ownership',
+    title: 'Proof of Vehicle Ownership',
+    description: 'Registration in your name, a finance agreement, or a signed letter from the owner allowing you to use the vehicle.',
     category: 'Vehicle',
   },
   {
@@ -80,7 +101,12 @@ const REQUIRED_DOCS: {
   },
 ];
 
-export const DriverPendingScreen: React.FC = () => {
+interface DriverPendingScreenProps {
+  // Shown inside the driver console (approved drivers): no page frame, sign-out or email banner
+  embedded?: boolean;
+}
+
+export const DriverPendingScreen: React.FC<DriverPendingScreenProps> = ({ embedded = false }) => {
   const {
     currentUser,
     userProfile,
@@ -328,17 +354,11 @@ export const DriverPendingScreen: React.FC = () => {
   };
 
   const isRejected = driverProfile?.verificationStatus === 'rejected';
+  const isApproved = driverProfile?.verificationStatus === 'approved';
   const docs = driverProfile?.verificationDocuments || {};
 
   // Count uploaded and approved docs
-  const keyMap: Record<DriverDocumentType, string> = {
-    'drivers-license': 'driversLicense',
-    'prdp': 'prdp',
-    'vehicle-registration': 'vehicleRegistration',
-    'vehicle-inspection': 'vehicleInspection',
-    'profile-photo': 'profilePhoto',
-    'operating-license': 'operatingLicense',
-  };
+  const keyMap = DRIVER_DOCUMENT_FIELD_KEYS;
 
   const uploadedCount = REQUIRED_DOCS.filter(
     (rd) => !!docs[keyMap[rd.type]]
@@ -347,11 +367,21 @@ export const DriverPendingScreen: React.FC = () => {
   return (
     <div
       id="driver-pending-scroll-container"
-      className="relative flex-1 w-full h-full min-h-0 overflow-y-auto overscroll-contain bg-white p-3 sm:p-6 py-6 sm:py-8"
+      className={
+        embedded
+          ? 'relative w-full'
+          : 'relative flex-1 w-full h-full min-h-0 overflow-y-auto overscroll-contain bg-white p-3 sm:p-6 py-6 sm:py-8'
+      }
     >
-      <div className="mx-auto w-full max-w-2xl space-y-5 rounded-card border border-line bg-white p-5 shadow-raised sm:p-8">
+      <div
+        className={
+          embedded
+            ? 'w-full space-y-4'
+            : 'mx-auto w-full max-w-2xl space-y-5 rounded-card border border-line bg-white p-5 shadow-raised sm:p-8'
+        }
+      >
         {/* Email Verification Banner */}
-        {!isEmailVerified && (
+        {!embedded && !isEmailVerified && (
           <div className="rounded-card border border-amber-300 bg-amber-50/90 p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-card">
@@ -418,6 +448,10 @@ export const DriverPendingScreen: React.FC = () => {
               <div className="flex h-16 w-16 items-center justify-center rounded-card bg-red-100 text-danger">
                 <AlertTriangle className="h-8 w-8" />
               </div>
+            ) : isApproved ? (
+              <div className="flex h-16 w-16 items-center justify-center rounded-card bg-emerald-100 text-success">
+                <ShieldCheck className="h-8 w-8" />
+              </div>
             ) : (
               <>
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-card bg-amber-300/40" />
@@ -433,45 +467,32 @@ export const DriverPendingScreen: React.FC = () => {
               className={`inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${
                 isRejected
                   ? 'bg-red-100 text-red-800 border border-red-200'
+                  : isApproved
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                   : 'bg-amber-100 text-amber-900 border border-amber-200'
               }`}
             >
-              {isRejected ? 'Application Status: Requires Attention' : 'Application Status: In Verification'}
+              {isRejected
+                ? 'Application Status: Requires Attention'
+                : isApproved
+                ? 'Application Status: Approved'
+                : 'Application Status: In Verification'}
             </span>
             <h2 className="mt-2 text-xl font-bold text-ink">
-              {isRejected
-                ? 'Driver Application Not Approved'
-                : 'South African Driver Verification'}
+              {isRejected ? 'Driver Application Not Approved' : 'Driver Application'}
             </h2>
             <p className="mt-1 text-xs text-ink-2 leading-relaxed max-w-lg mx-auto">
               {isRejected
                 ? (driverProfile?.rejectionReason || 'Our fleet compliance team could not verify some of your details. Review the documents below or re-upload clearer photos.')
-                : 'Welcome to ZAKA! In accordance with the National Land Transport Act and passenger safety standards, please upload the required verification credentials below.'}
+                : isApproved
+                ? 'Your application is approved. Your details and documents are kept here; upload a new copy when a document expires.'
+                : 'Welcome to ZAKA! To drive with us, complete your personal details, confirm your vehicle and upload the supporting documents below. ZAKA Admin reviews every application before you can go online.'}
             </p>
           </div>
         </div>
 
-        {/* Registered Vehicle Card */}
-        {driverProfile?.vehicle && (
-          <div className="rounded-card border border-line bg-surface-2 p-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-ink">
-                <Car className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-ink">
-                  {driverProfile.vehicle.colour} {driverProfile.vehicle.make} {driverProfile.vehicle.model}
-                </p>
-                <p className="text-[11px] font-mono text-ink-3">
-                  {driverProfile.vehicle.registrationNumber} • {driverProfile.vehicle.vehicleType.toUpperCase()} Class
-                </p>
-              </div>
-            </div>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 uppercase">
-              Registered
-            </span>
-          </div>
-        )}
+        {/* Personal details and vehicle */}
+        <DriverApplicationDetails />
 
         {/* Documents Upload Section */}
         <div className="space-y-3 rounded-card border border-line bg-white p-4">
@@ -708,24 +729,26 @@ export const DriverPendingScreen: React.FC = () => {
             {signOutError}
           </div>
         )}
-        <div className="flex items-center justify-between border-t border-line pt-3 text-xs text-ink-3">
-          <span>Logged in as {userProfile?.name || 'Driver'}</span>
-          <button
-            disabled={isSigningOut}
-            onClick={async () => {
-              try {
-                setSignOutError(null);
-                await signOut();
-              } catch (err: any) {
-                setSignOutError(err?.message || 'Failed to sign out.');
-              }
-            }}
-            className="flex items-center gap-1 font-bold text-danger hover:underline disabled:opacity-50"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>{isSigningOut ? 'Signing Out...' : 'Sign Out'}</span>
-          </button>
-        </div>
+        {!embedded && (
+          <div className="flex items-center justify-between border-t border-line pt-3 text-xs text-ink-3">
+            <span>Logged in as {userProfile?.name || 'Driver'}</span>
+            <button
+              disabled={isSigningOut}
+              onClick={async () => {
+                try {
+                  setSignOutError(null);
+                  await signOut();
+                } catch (err: any) {
+                  setSignOutError(err?.message || 'Failed to sign out.');
+                }
+              }}
+              className="flex items-center gap-1 font-bold text-danger hover:underline disabled:opacity-50"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>{isSigningOut ? 'Signing Out...' : 'Sign Out'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Document Preview Modal */}

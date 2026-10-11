@@ -73,7 +73,7 @@ export const DriverApp: React.FC = () => {
   const [justCompletedTrip, setJustCompletedTrip] = useState<RideDocument | null>(null);
   const [incomingRequests, setIncomingRequests] = useState<RideDocument[]>([]);
   const [isAccepting, setIsAccepting] = useState<boolean>(false);
-  const [viewTab, setViewTab] = useState<'console' | 'earnings' | 'history'>('console');
+  const [viewTab, setViewTab] = useState<'console' | 'earnings' | 'history' | 'application'>('console');
 
   // Clear active/completed trips when activeDemoRideId is cleared in demo mode
   useEffect(() => {
@@ -117,6 +117,8 @@ export const DriverApp: React.FC = () => {
   const isDemo = Boolean(userProfile?.isDemo || userProfile?.uid?.startsWith('demo-') || isDemoTestMode);
   const [gpsState, setGpsState] = useState<GpsTrackingState>('LOCATION_REQUESTING');
   const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
+  // The current position comes from a coarse fix (network / Wi-Fi), not a precise satellite fix
+  const [gpsApproximate, setGpsApproximate] = useState<boolean>(false);
   const [isSimulatingGps, setIsSimulatingGps] = useState<boolean>(isDemo);
   const [toggleOnlineError, setToggleOnlineError] = useState<string | null>(null);
 
@@ -158,6 +160,7 @@ export const DriverApp: React.FC = () => {
           longitude: fix.longitude,
         };
         setDriverLocation(freshCoords);
+        lastAcceptedFixAtRef.current = Date.now();
         setGpsState('LOCATION_GRANTED');
         setGpsErrorMsg(null);
 
@@ -184,7 +187,9 @@ export const DriverApp: React.FC = () => {
     }
   };
 
-  // Production GPS tracking using real device geolocation
+  // Production GPS tracking using real device geolocation.
+  // A warning is only raised when the device has really lost its position: a parked driver produces no
+  // new readings, and indoor timeouts are routine, so neither of those counts as a failure on its own.
   useEffect(() => {
     if (!isOnline || isSimulatingGps) {
       return;
@@ -196,100 +201,130 @@ export const DriverApp: React.FC = () => {
       return;
     }
 
-    setGpsState('LOCATION_REQUESTING');
-    let watchId: number | null = null;
-    let staleTimeout: NodeJS.Timeout | null = null;
+    const GOOD_ACCURACY_M = 100; // precise enough for street-level dispatch
+    const MAX_ACCURACY_M = 2000; // anything coarser is not a usable position
+    const COARSE_AFTER_MS = 10000; // a coarse fix is used once no precise fix has arrived for this long
+    const POLL_MS = 15000; // while the watch is silent, the position is asked for directly
+    const LOST_AFTER_MS = 60000; // no position at all for this long = signal lost
 
-    const armStaleTimer = () => {
-      if (staleTimeout) clearTimeout(staleTimeout);
-      staleTimeout = setTimeout(() => {
-        setGpsState('LOCATION_STALE');
-      }, TELEMETRY_THRESHOLDS.STALE_LOCATION_MS);
+    const startedAt = Date.now();
+    let cancelled = false;
+    // Time of the last usable position (or since tracking started, when there has been none yet)
+    const lastSignalAt = () => Math.max(lastAcceptedFixAtRef.current, startedAt);
+
+    // Going online has just taken a fix: tracking carries on from it instead of showing "acquiring" again
+    if (Date.now() - lastAcceptedFixAtRef.current > LOST_AFTER_MS) {
+      setGpsState('LOCATION_REQUESTING');
+    }
+
+    const acceptFix = (pos: GeolocationPosition) => {
+      if (cancelled) return;
+
+      // Discard an old cached fix from the device
+      if (pos.timestamp && Date.now() - pos.timestamp > 60000) {
+        return;
+      }
+
+      // Validate coordinate bounds
+      if (
+        isNaN(pos.coords.latitude) ||
+        isNaN(pos.coords.longitude) ||
+        pos.coords.latitude < -90 ||
+        pos.coords.latitude > 90 ||
+        pos.coords.longitude < -180 ||
+        pos.coords.longitude > 180
+      ) {
+        return;
+      }
+
+      // A coarse fix (> 100 m) never replaces a recent precise one. It is used when nothing better has
+      // arrived for a while: otherwise a phone indoors would have no position at all.
+      const accuracy = pos.coords.accuracy || 0;
+      const coarse = accuracy > GOOD_ACCURACY_M;
+      const sinceLastFix = Date.now() - lastAcceptedFixAtRef.current;
+      if (coarse && (accuracy > MAX_ACCURACY_M || sinceLastFix < COARSE_AFTER_MS)) {
+        return;
+      }
+
+      const coords: LocationCoordinates = {
+        latitude: Number(pos.coords.latitude.toFixed(6)),
+        longitude: Number(pos.coords.longitude.toFixed(6)),
+      };
+
+      // Jump rejection (anomalous teleportation > 5000m). Only measured against a fix accepted in the
+      // last 10 s: against an older or default position a real move would be rejected forever.
+      const currentLoc = driverLocationRef.current;
+      if (currentLoc && currentLoc.latitude !== 0 && sinceLastFix < 10000) {
+        const jumpDist = mapService.distanceMeters(currentLoc, coords);
+        if (jumpDist > 5000) {
+          console.warn('Discarding extreme GPS jump anomaly:', jumpDist, 'meters');
+          return;
+        }
+      }
+
+      lastAcceptedFixAtRef.current = Date.now();
+      // Same position again (parked): keep the same object so nothing re-renders
+      setDriverLocation((prev) =>
+        prev.latitude === coords.latitude && prev.longitude === coords.longitude ? prev : coords
+      );
+      setGpsState('LOCATION_GRANTED');
+      setGpsApproximate(coarse);
+      setGpsErrorMsg(null);
+
+      // Persist to Firestore with 15m / 10s throttling
+      const uid = userProfileUidRef.current;
+      if (uid) {
+        firestoreService.updateDriverLocationAndRide(
+          uid,
+          coords,
+          activeTripIdRef.current,
+          false // throttled
+        );
+      }
     };
 
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        // Discard stale cached fix from device
-        if (pos.timestamp && Date.now() - pos.timestamp > 20000) {
-          return;
-        }
-
-        // Reject poor accuracy fixes (> 100m is too coarse for street dispatch)
-        if (pos.coords.accuracy && pos.coords.accuracy > 100) {
-          console.warn('GPS fix rejected due to low accuracy (> 100m):', pos.coords.accuracy);
-          return;
-        }
-
-        // Validate coordinate bounds
-        if (
-          isNaN(pos.coords.latitude) ||
-          isNaN(pos.coords.longitude) ||
-          pos.coords.latitude < -90 ||
-          pos.coords.latitude > 90 ||
-          pos.coords.longitude < -180 ||
-          pos.coords.longitude > 180
-        ) {
-          return;
-        }
-
-        const coords: LocationCoordinates = {
-          latitude: Number(pos.coords.latitude.toFixed(6)),
-          longitude: Number(pos.coords.longitude.toFixed(6)),
-        };
-
-        // Jump rejection (anomalous teleportation > 5000m). Only measured against a fix accepted in the
-        // last 10 s: against an older or default position a real move would be rejected forever.
-        const currentLoc = driverLocationRef.current;
-        const sinceLastFix = Date.now() - lastAcceptedFixAtRef.current;
-        if (currentLoc && currentLoc.latitude !== 0 && sinceLastFix < 10000) {
-          const jumpDist = mapService.distanceMeters(currentLoc, coords);
-          if (jumpDist > 5000) {
-            console.warn('Discarding extreme GPS jump anomaly:', jumpDist, 'meters');
-            return;
-          }
-        }
-
-        // Always update local state immediately for responsive local rendering
-        lastAcceptedFixAtRef.current = Date.now();
-        setDriverLocation(coords);
-        setGpsState('LOCATION_GRANTED');
-        setGpsErrorMsg(null);
-        armStaleTimer();
-
-        // Persist to Firestore with 15m / 10s throttling
-        const uid = userProfileUidRef.current;
-        if (uid) {
-          firestoreService.updateDriverLocationAndRide(
-            uid,
-            coords,
-            activeTripIdRef.current,
-            false // throttled
-          );
-        }
-      },
-      (err) => {
-        console.warn('Driver device GPS watch error:', err);
-        if (err.code === 1) {
-          setGpsState('LOCATION_DENIED');
-          setGpsErrorMsg('Location permission denied. Enable GPS in browser permissions to receive passenger dispatch.');
-        } else if (err.code === 2) {
-          setGpsState('LOCATION_UNAVAILABLE');
-          setGpsErrorMsg('Your GPS location is temporarily unavailable.');
-        } else {
-          setGpsState('LOCATION_ERROR');
-          setGpsErrorMsg('GPS signal timeout. Retrying satellite lock...');
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 5000,
+    const handleError = (err: GeolocationPositionError) => {
+      if (cancelled) return;
+      if (err.code === 1) {
+        console.warn('Driver device GPS permission denied:', err);
+        setGpsState('LOCATION_DENIED');
+        setGpsErrorMsg('Location permission denied. Allow location access for ZAKA in your device settings to receive ride requests.');
+        return;
       }
-    );
+      // Timeout or temporarily unavailable: the device keeps trying. Only reported once the position
+      // has been missing for a full minute.
+      if (Date.now() - lastSignalAt() < LOST_AFTER_MS) return;
+      console.warn('Driver device GPS signal lost:', err);
+      setGpsState(err.code === 2 ? 'LOCATION_UNAVAILABLE' : 'LOCATION_ERROR');
+      setGpsErrorMsg('No GPS signal. Move to an open area or check that Location is switched on. ZAKA reconnects automatically.');
+    };
+
+    const watchId = navigator.geolocation.watchPosition(acceptFix, handleError, {
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 5000,
+    });
+
+    // The watch only reports movement on many devices. While it is silent the position is requested
+    // directly, which keeps a parked driver's location confirmed.
+    const pollTimer = setInterval(() => {
+      const silentFor = Date.now() - lastSignalAt();
+      if (silentFor < POLL_MS) return;
+      navigator.geolocation.getCurrentPosition(acceptFix, handleError, {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 10000,
+      });
+      if (silentFor >= LOST_AFTER_MS) {
+        setGpsState((prev) => (prev === 'LOCATION_GRANTED' || prev === 'LOCATION_REQUESTING' ? 'LOCATION_STALE' : prev));
+        setGpsErrorMsg((prev) => prev || 'No GPS signal. Move to an open area or check that Location is switched on. ZAKA reconnects automatically.');
+      }
+    }, POLL_MS);
 
     return () => {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      if (staleTimeout) clearTimeout(staleTimeout);
+      cancelled = true;
+      navigator.geolocation.clearWatch(watchId);
+      clearInterval(pollTimer);
     };
   }, [isOnline, isSimulatingGps]);
 
@@ -620,7 +655,9 @@ export const DriverApp: React.FC = () => {
               ) : gpsState === 'LOCATION_GRANTED' ? (
                 <>
                   <Satellite className="h-3.5 w-3.5 text-success" />
-                  <span className="text-emerald-800">GPS Locked (High Accuracy)</span>
+                  <span className="text-emerald-800">
+                    {gpsApproximate ? 'GPS Active (Approximate)' : 'GPS Locked (High Accuracy)'}
+                  </span>
                   {isDemo && (
                     <button
                       onClick={() => setIsSimulatingGps(true)}
@@ -638,7 +675,9 @@ export const DriverApp: React.FC = () => {
               ) : (
                 <>
                   <WifiOff className="h-3.5 w-3.5 text-red-500" />
-                  <span className="text-danger">GPS Warning</span>
+                  <span className="text-danger">
+                    {gpsState === 'LOCATION_DENIED' ? 'Location Blocked' : 'No GPS Signal'}
+                  </span>
                 </>
               )}
             </div>
@@ -719,7 +758,21 @@ export const DriverApp: React.FC = () => {
           >
             History
           </button>
+          <button
+            id="tab-driver-application"
+            onClick={() => setViewTab('application')}
+            className={`flex-1 rounded-full py-1.5 text-xs font-bold transition-all ${
+              viewTab === 'application'
+                ? 'bg-white text-ink shadow-card'
+                : 'text-ink-3 hover:text-ink'
+            }`}
+          >
+            Application
+          </button>
         </div>
+
+        {/* ================= DRIVER APPLICATION: details, vehicle and documents ================= */}
+        {viewTab === 'application' && <DriverPendingScreen embedded />}
 
         {/* ================= TAB 1: DRIVER CONSOLE ================= */}
         {viewTab === 'console' && (

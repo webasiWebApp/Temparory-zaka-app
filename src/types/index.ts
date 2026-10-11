@@ -235,15 +235,35 @@ export interface DriverProfile {
     vehicleInspection?: DriverDocumentRecord;
     profilePhoto?: DriverDocumentRecord;
     operatingLicense?: DriverDocumentRecord;
+    idDocument?: DriverDocumentRecord;
+    proofOfAddress?: DriverDocumentRecord;
+    proofOfOwnership?: DriverDocumentRecord;
     [key: string]: DriverDocumentRecord | undefined;
   };
   currentLocation?: LocationCoordinates & { timestamp: number };
   vehicle?: DriverVehicle;
+  // Set when the driver has submitted their personal details (kept in DriverPrivateDetails, never here)
+  detailsSubmittedAt?: string;
   earningsToday?: number;
   earningsThisWeek?: number;
   totalEarnings?: number;
   isDemo?: boolean;
   demoPersona?: 'amara' | 'sipho' | 'kofi' | 'chidi';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * A driver's personal details. Stored in /drivers/{uid}/private/details, which only the driver and
+ * Admin can read: the driver document itself is visible to passengers looking for a ride.
+ */
+export interface DriverPrivateDetails {
+  userId: string;
+  homeAddress: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  gender: 'male' | 'female';
+  nationality: string;
+  idNumber: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -254,7 +274,23 @@ export type DriverDocumentType =
   | 'vehicle-registration'
   | 'vehicle-inspection'
   | 'profile-photo'
-  | 'operating-license';
+  | 'operating-license'
+  | 'id-document'
+  | 'proof-of-address'
+  | 'proof-of-ownership';
+
+// Field under DriverProfile.verificationDocuments that holds each document type
+export const DRIVER_DOCUMENT_FIELD_KEYS: Record<DriverDocumentType, string> = {
+  'drivers-license': 'driversLicense',
+  'prdp': 'prdp',
+  'vehicle-registration': 'vehicleRegistration',
+  'vehicle-inspection': 'vehicleInspection',
+  'profile-photo': 'profilePhoto',
+  'operating-license': 'operatingLicense',
+  'id-document': 'idDocument',
+  'proof-of-address': 'proofOfAddress',
+  'proof-of-ownership': 'proofOfOwnership',
+};
 
 export type DocumentStatus = 'pending' | 'approved' | 'rejected';
 

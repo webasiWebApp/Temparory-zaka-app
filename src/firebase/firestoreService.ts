@@ -35,6 +35,8 @@ import {
   DriverVehicle,
   DriverDocumentRecord,
   DriverDocumentType,
+  DriverPrivateDetails,
+  DRIVER_DOCUMENT_FIELD_KEYS,
   DocumentStatus,
   RideDocument,
   RideStatus,
@@ -773,6 +775,41 @@ export const firestoreService = {
       console.warn('Notice reading driver profile:', e);
       return null;
     }
+  },
+
+  /** A driver's personal details: readable by the driver and Admin only (null when not submitted yet) */
+  async getDriverPrivateDetails(driverId: string): Promise<DriverPrivateDetails | null> {
+    const snap = await getDoc(doc(db, 'drivers', driverId, 'private', 'details'));
+    return snap.exists() ? (snap.data() as DriverPrivateDetails) : null;
+  },
+
+  /**
+   * Saves the driver's personal details. The security rules fix date of birth, gender, nationality and
+   * ID number once they have been saved; the home address can still be updated.
+   */
+  async saveDriverPrivateDetails(
+    driverId: string,
+    details: Partial<Omit<DriverPrivateDetails, 'userId' | 'createdAt' | 'updatedAt'>>,
+    isFirstSave: boolean
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    await setDoc(
+      doc(db, 'drivers', driverId, 'private', 'details'),
+      removeUndefinedFields({
+        ...details,
+        userId: driverId,
+        ...(isFirstSave ? { createdAt: now } : {}),
+        updatedAt: now,
+      }),
+      { merge: true }
+    );
+    if (isFirstSave) {
+      await updateDoc(doc(db, 'drivers', driverId), { detailsSubmittedAt: now, updatedAt: now });
+    }
+  },
+
+  async deleteDriverPrivateDetails(driverId: string): Promise<void> {
+    await deleteDoc(doc(db, 'drivers', driverId, 'private', 'details')).catch(() => {});
   },
 
   async createOrUpdateVehicle(vehicle: DriverVehicle): Promise<void> {
@@ -2216,14 +2253,7 @@ export const firestoreService = {
     docRecord: DriverDocumentRecord
   ): Promise<void> {
     const driverRef = doc(db, 'drivers', driverId);
-    const keyMap: Record<DriverDocumentType, string> = {
-      'drivers-license': 'driversLicense',
-      'prdp': 'prdp',
-      'vehicle-registration': 'vehicleRegistration',
-      'vehicle-inspection': 'vehicleInspection',
-      'profile-photo': 'profilePhoto',
-      'operating-license': 'operatingLicense',
-    };
+    const keyMap = DRIVER_DOCUMENT_FIELD_KEYS;
     const fieldKey = keyMap[docRecord.documentType] || docRecord.documentType;
     const nowIso = new Date().toISOString();
 
@@ -2327,14 +2357,7 @@ export const firestoreService = {
     adminInfo?: { adminId: string; adminEmail: string }
   ): Promise<void> {
     const driverRef = doc(db, 'drivers', driverId);
-    const keyMap: Record<DriverDocumentType, string> = {
-      'drivers-license': 'driversLicense',
-      'prdp': 'prdp',
-      'vehicle-registration': 'vehicleRegistration',
-      'vehicle-inspection': 'vehicleInspection',
-      'profile-photo': 'profilePhoto',
-      'operating-license': 'operatingLicense',
-    };
+    const keyMap = DRIVER_DOCUMENT_FIELD_KEYS;
     const fieldKey = keyMap[documentType] || documentType;
     const nowIso = new Date().toISOString();
 

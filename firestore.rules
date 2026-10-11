@@ -65,6 +65,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/passengers/$(request.auth.uid)).data.get('verificationStatus', 'unverified') == 'approved';
     }
 
+    // The account has a driver record: its phone number and email address are fixed after registration
+    function hasDriverRecord(userId) {
+      return exists(/databases/$(database)/documents/drivers/$(userId));
+    }
+
     function isDriver() {
       return (hasUserDoc() && getUserData().get('role', '') == 'driver') ||
              exists(/databases/$(database)/documents/drivers/$(request.auth.uid));
@@ -108,6 +113,14 @@ service cloud.firestore {
           (
             request.resource.data.get('name', '') == resource.data.get('name', '') ||
             !passengerIdentityLocked(userId)
+          ) &&
+          // A driver's phone number and email address cannot be changed once they are on record
+          (
+            (
+              (resource.data.get('phone', '') == '' || request.resource.data.get('phone', '') == resource.data.get('phone', '')) &&
+              (resource.data.get('email', '') == '' || request.resource.data.get('email', '') == resource.data.get('email', ''))
+            ) ||
+            !hasDriverRecord(userId)
           )
         )
       );
@@ -222,6 +235,26 @@ service cloud.firestore {
     // A driver can ONLY read their own profile; admins can read all;
     // Online & verified drivers readable by passengers for map radar (never by other drivers)
     match /drivers/{driverId} {
+      function vehicleField(data, key) {
+        return data.get('vehicle', {}).get(key, '');
+      }
+
+      // Make, model, colour, licence plate and class cannot change once a vehicle is registered
+      function vehicleUnchanged() {
+        return vehicleField(resource.data, 'registrationNumber') == '' || (
+          vehicleField(request.resource.data, 'make') == vehicleField(resource.data, 'make') &&
+          vehicleField(request.resource.data, 'model') == vehicleField(resource.data, 'model') &&
+          vehicleField(request.resource.data, 'colour') == vehicleField(resource.data, 'colour') &&
+          vehicleField(request.resource.data, 'registrationNumber') == vehicleField(resource.data, 'registrationNumber') &&
+          vehicleField(request.resource.data, 'vehicleType') == vehicleField(resource.data, 'vehicleType')
+        );
+      }
+
+      function driverPhoneUnchanged() {
+        return resource.data.get('phone', '') == '' ||
+          request.resource.data.get('phone', '') == resource.data.get('phone', '');
+      }
+
       allow read: if isAuthenticated() && (
         request.auth.uid == driverId ||
         isRealAdmin() ||
@@ -262,6 +295,8 @@ service cloud.firestore {
               resource.data.get('isDemo', false) != true &&
               (!request.resource.data.get('online', false) || resource.data.get('verificationStatus', '') == 'approved') &&
               request.resource.data.get('verificationStatus', 'pending') == resource.data.get('verificationStatus', 'pending') &&
+              vehicleUnchanged() &&
+              driverPhoneUnchanged() &&
               !request.resource.data.diff(resource.data).affectedKeys().hasAny([
                 'verificationStatus', 'rating', 'totalRatings', 'ratingSum',
                 'platformCommission', 'earningsToday', 'earningsThisWeek', 'totalEarnings',
@@ -297,6 +332,27 @@ service cloud.firestore {
           )
         );
         allow delete: if isRealAdmin();
+      }
+
+      // Personal details (home address, date of birth, gender, nationality, ID number).
+      // Driver and Admin only: passengers can read the driver document above, never this.
+      match /private/{docId} {
+        allow read: if isAuthenticated() && (request.auth.uid == driverId || isRealAdmin());
+        allow create: if isAuthenticated() && (
+          isRealAdmin() ||
+          (!isAnonymous() && request.auth.uid == driverId)
+        );
+        // Identity details are fixed once saved; the driver can still update their home address
+        allow update: if isAuthenticated() && (
+          isRealAdmin() ||
+          (
+            request.auth.uid == driverId &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'dateOfBirth', 'gender', 'nationality', 'idNumber', 'userId', 'createdAt'
+            ])
+          )
+        );
+        allow delete: if isAuthenticated() && (request.auth.uid == driverId || isRealAdmin());
       }
     }
 
@@ -367,7 +423,10 @@ service cloud.firestore {
         isRealAdmin() ||
         (
           (request.auth.uid == vehicleId || resource.data.get('driverId', '') == request.auth.uid) &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'verificationStatus', 'approvedAt', 'approvedBy'])
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'status', 'verificationStatus', 'approvedAt', 'approvedBy',
+            'make', 'model', 'colour', 'registrationNumber', 'vehicleType', 'driverId'
+          ])
         ) ||
         (resource.data.get('isDemo', false) == true && request.resource.data.get('isDemo', false) == true)
       );

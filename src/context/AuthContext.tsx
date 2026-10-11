@@ -1010,6 +1010,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       // Identity verification photos (ID document and selfie)
       await firestoreService.deletePassengerVerificationImages(uid);
+      // Driver's personal details (home address, date of birth, nationality, ID number)
+      await firestoreService.deleteDriverPrivateDetails(uid);
       // 1. Delete or anonymize profile data in Firestore
       await firestoreService.deleteOrAnonymizeUserProfile(uid);
       // 2. Delete the user from Firebase Auth

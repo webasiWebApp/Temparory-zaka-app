@@ -57,6 +57,9 @@ export const DOCUMENT_TITLES: Record<DriverDocumentType, string> = {
   'vehicle-inspection': 'Vehicle Roadworthy Inspection Certificate',
   'profile-photo': 'Driver Profile Photo',
   'operating-license': 'Operating Licence / PRE Permit',
+  'id-document': 'ID Document',
+  'proof-of-address': 'Proof of Address',
+  'proof-of-ownership': 'Proof of Vehicle Ownership',
 };
 
 // Fast reachability cache for Firebase Storage bucket

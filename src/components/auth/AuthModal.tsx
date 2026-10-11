@@ -905,6 +905,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
                   )}
 
+                  {/* What happens after the account is created */}
+                  {role === 'driver' && (
+                    <div className="flex items-start gap-2 rounded-card border border-line bg-surface-2 p-3 text-[11px] text-ink-2">
+                      <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary-text" />
+                      <span>
+                        Next step: your driver application. You will add your home address and identity details and upload your
+                        ID document, proof of address, Professional Driving Permit (PDP), vehicle registration and proof of
+                        vehicle ownership. Vehicle details cannot be changed after registration.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Driver Vehicle Specs */}
                   {role === 'driver' && (
                     <div className="rounded-card border border-line bg-surface-2 p-3.5 space-y-2.5">
