@@ -7,7 +7,11 @@
 export type UserRole = 'passenger' | 'driver' | 'admin';
 export type UserStatus = 'active' | 'pending' | 'suspended';
 
+// 'moto' is retired: it is kept in the type only so rides and vehicles saved before its removal still load
 export type VehicleType = 'economy' | 'comfort' | 'xl' | 'moto';
+
+// Ride types passengers can book and drivers can register for
+export const ACTIVE_VEHICLE_TYPES: VehicleType[] = ['economy', 'comfort', 'xl'];
 
 export type PaymentMethod = 'cash' | 'card' | 'digital' | 'wallet';
 export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled';
@@ -137,22 +141,55 @@ export interface PhoneIndexRecord {
   updatedAt: string;
 }
 
+export type PassengerVerificationStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
+
+export type PassengerVerificationImageKind = 'idDocument' | 'selfie';
+
+// Stored in /passengers/{uid}/verification/{kind}: readable by the passenger and Admin only
+export interface PassengerVerificationImage {
+  kind: PassengerVerificationImageKind;
+  dataUrl: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: string;
+}
+
+export interface SavedPlace {
+  id: string;
+  label: string;
+  address: string;
+  location: LocationCoordinates;
+  icon: 'home' | 'work' | 'airport' | 'favorite';
+}
+
 export interface PassengerProfile {
   userId: string;
   name: string;
   phone: string;
+  // The number was confirmed with a one-time SMS code (Firebase phone verification)
+  phoneVerified?: boolean;
+  phoneVerifiedAt?: string;
+  // Identity details: fixed once submitted for verification
+  dateOfBirth?: string; // YYYY-MM-DD
+  gender?: 'male' | 'female';
+  nationality?: string;
+  idNumber?: string;
+  // Set to 'pending' by the passenger on submission; 'approved' / 'rejected' by Admin only
+  verificationStatus?: PassengerVerificationStatus;
+  verificationSubmittedAt?: string;
+  verificationReviewedAt?: string;
+  verificationReviewedBy?: string;
+  rejectionReason?: string;
+  verificationDocuments?: {
+    idDocument?: { fileName: string; uploadedAt: string };
+    selfie?: { fileName: string; uploadedAt: string };
+  };
   rating: number;
   totalTrips: number;
   totalRatings?: number;
   ratingSum?: number;
   walletBalance?: number;
-  savedPlaces?: {
-    id: string;
-    label: string;
-    address: string;
-    location: LocationCoordinates;
-    icon: 'home' | 'work' | 'airport' | 'favorite';
-  }[];
+  savedPlaces?: SavedPlace[];
   isDemo?: boolean;
   demoPersona?: 'amara' | 'sipho' | 'kofi' | 'chidi';
   createdAt: string;
@@ -328,7 +365,7 @@ export interface PaymentRecord {
   transactionReference: string;
   merchantTransactionId?: string;
   providerTransactionId?: string;
-  peachCheckoutId?: string;
+  gatewaySessionId?: string;
   redirectUrl?: string;
   settledByServer?: boolean; // amount and split were written by the trusted backend
   failureReason?: string;
@@ -432,9 +469,11 @@ export interface AdminAuditRecord {
     | 'update_pricing'
     | 'send_broadcast'
     | 'revoke_driver'
+    | 'approve_passenger'
+    | 'reject_passenger'
     | 'DRIVER_EMERGENCY_SOS';
   targetId: string;
-  targetType: 'driver' | 'document' | 'pricing' | 'broadcast' | 'ride' | 'emergency';
+  targetType: 'driver' | 'passenger' | 'document' | 'pricing' | 'broadcast' | 'ride' | 'emergency';
   details: string;
   timestamp: string;
 }

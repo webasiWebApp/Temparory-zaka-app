@@ -156,7 +156,7 @@ export const ComplianceModal: React.FC<ComplianceModalProps> = ({
                   <li><strong>Account Data:</strong> Name, verified South African mobile phone number, email address, profile photo.</li>
                   <li><strong>Live Geolocation:</strong> Device GPS coordinates during active app usage to match nearest drivers, provide pickup navigation, and calculate live ETAs.</li>
                   <li><strong>Driver Verification Records:</strong> Identity documents, PrDP permits, vehicle registration (RC1), roadworthy certificates, and municipal operating licences.</li>
-                  <li><strong>Transaction Records:</strong> Trip origins, destinations, timestamps, fare amounts, and payment references. Electronic card payments are tokenized securely through Peach Payments PCI-DSS Level 1 compliant gateway; ZAKA never stores raw credit card CVV or PAN numbers.</li>
+                  <li><strong>Transaction Records:</strong> Trip origins, destinations, timestamps, fare amounts, and payment references. Electronic card payments are tokenized securely through VodaPay PCI-DSS Level 1 compliant gateway; ZAKA never stores raw credit card CVV or PAN numbers.</li>
                 </ul>
               </section>
 

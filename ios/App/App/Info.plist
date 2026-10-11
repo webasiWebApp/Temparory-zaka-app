@@ -68,6 +68,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ZAKA uses your location to set accurate pickup points, discover nearby verified drivers, and calculate transparent upfront fares.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ZAKA uses the camera to take a live photo of you and a photo of your ID document for identity verification.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

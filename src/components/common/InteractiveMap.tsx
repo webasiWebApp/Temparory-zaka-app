@@ -4,11 +4,11 @@
  * ZAKA E-Hailing Platform - Google Maps Interactive Map Component
  *
  * Real Google Maps JavaScript API vector rendering via @vis.gl/react-google-maps:
- * - Clean modern commercial ride-hailing styling
+ * - Black-and-white base map; only the pickup, the destination and the route are in colour
  * - Custom ZAKA orange pickup marker with ground radar pulse
  * - Charcoal destination marker with orange core
  * - Real-time vehicle icons with rotation
- * - Route polyline display
+ * - Route drawn along the actual roads between pickup and destination
  * - GPS recentering button
  * - Preserves pickup/destination selection & map clicking
  */
@@ -25,7 +25,6 @@ import { locationService, routingService, RouteGeometry } from '../../services/l
 import {
   GOOGLE_MAPS_API_KEY,
   GOOGLE_MAPS_MAP_ID,
-  ZAKA_RIDE_MAP_STYLE,
   INTERNAL_USAGE_ATTRIBUTION_ID,
 } from '../../config/googleMapsConfig';
 import { Polyline } from './GoogleMapPolyline';
@@ -173,9 +172,19 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
   onRecenter,
 }) => {
   const [routeCoordinates, setRouteCoordinates] = useState<google.maps.LatLngLiteral[]>([]);
+  // True only when no road route could be obtained and the line is a rough guide (drawn dashed)
+  const [routeIsApproximate, setRouteIsApproximate] = useState(false);
   const [calculatedDurationMin, setCalculatedDurationMin] = useState<number | null>(null);
   const lastRoutePickupRef = useRef<LocationCoordinates | null>(null);
   const lastRouteDestRef = useRef<LocationCoordinates | null>(null);
+
+  // Parents pass a new callback on every render. Reading it through a ref keeps it out of the routing
+  // effect's dependencies: otherwise each parent re-render cancelled the road-route request in flight
+  // and the map was left showing the straight placeholder line.
+  const onRouteCalculatedRef = useRef(onRouteCalculated);
+  useEffect(() => {
+    onRouteCalculatedRef.current = onRouteCalculated;
+  }, [onRouteCalculated]);
 
   const initialCenter = useMemo<google.maps.LatLngLiteral>(() => {
     return {
@@ -184,7 +193,7 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
     };
   }, []);
 
-  // Calculate and Draw Route Line (Instant Optimistic + Background OSRM refinement)
+  // Calculate and draw the route: instant distance / time estimate, then the real road route
   useEffect(() => {
     const pLat = pickupLocation?.latitude;
     const pLng = pickupLocation?.longitude;
@@ -216,18 +225,17 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
       lastRoutePickupRef.current = { latitude: pLat, longitude: pLng };
       lastRouteDestRef.current = { latitude: dLat, longitude: dLng };
 
-      // 1. Instant optimistic route
+      // 1. Instant estimate for the fare and ETA. It is NOT drawn: a line that ignores the roads is misleading.
       const instantRoute = routingService.getInstantRouteGeometry(
         { latitude: pLat, longitude: pLng },
         { latitude: dLat, longitude: dLng }
       );
-      setRouteCoordinates(
-        instantRoute.coordinates.map(([lat, lng]) => ({ lat, lng }))
-      );
+      setRouteCoordinates([]);
+      setRouteIsApproximate(false);
       setCalculatedDurationMin(instantRoute.durationMin);
-      onRouteCalculated?.(instantRoute);
+      onRouteCalculatedRef.current?.(instantRoute);
 
-      // 2. Refined road network route
+      // 2. The real route along the road network
       let isSubscribed = true;
       locationService
         .getRoute({ latitude: pLat, longitude: pLng }, { latitude: dLat, longitude: dLng })
@@ -236,11 +244,18 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
           setRouteCoordinates(
             realRoute.coordinates.map(([lat, lng]) => ({ lat, lng }))
           );
+          setRouteIsApproximate(false);
           setCalculatedDurationMin(realRoute.durationMin);
-          onRouteCalculated?.(realRoute);
+          onRouteCalculatedRef.current?.(realRoute);
         })
         .catch((e) => {
-          console.warn('Google Map background road route note:', e);
+          if (!isSubscribed) return;
+          console.warn('Road route unavailable, showing an approximate guide line:', e);
+          // Allow the next change (or a retry) to request the road route again
+          lastRoutePickupRef.current = null;
+          lastRouteDestRef.current = null;
+          setRouteCoordinates(instantRoute.coordinates.map(([lat, lng]) => ({ lat, lng })));
+          setRouteIsApproximate(true);
         });
 
       return () => {
@@ -250,6 +265,7 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
       lastRoutePickupRef.current = null;
       lastRouteDestRef.current = null;
       setRouteCoordinates([]);
+      setRouteIsApproximate(false);
       setCalculatedDurationMin(null);
     }
   }, [
@@ -257,7 +273,6 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
     pickupLocation?.longitude,
     destinationLocation?.latitude,
     destinationLocation?.longitude,
-    onRouteCalculated,
   ]);
 
   // Derived effective trip duration
@@ -329,20 +344,36 @@ const InteractiveMapContent: React.FC<InteractiveMapProps> = ({
   }, [nearbyDrivers, activeRide, pickupLocation, isDemo]);
 
   return (
-    <div className={`relative h-full w-full overflow-hidden ${className}`}>
+    <div className={`zaka-map-mono relative h-full w-full overflow-hidden ${className}`}>
+      {/* Raster rendering: the base map is plain image tiles, which .zaka-map-mono (index.css) turns
+          black-and-white. Markers and the route are separate layers and keep their colours. */}
       <Map
         mapId={GOOGLE_MAPS_MAP_ID}
+        renderingType="RASTER"
         defaultCenter={initialCenter}
         defaultZoom={15.5}
         gestureHandling="greedy"
         disableDefaultUI={true}
         clickableIcons={false}
-        styles={ZAKA_RIDE_MAP_STYLE}
         className="w-full h-full"
         internalUsageAttributionIds={[INTERNAL_USAGE_ATTRIBUTION_ID]}
       >
         {/* Dual-Layer Route Polyline (rendered with zIndex 20-21, well beneath markers at 900+) */}
-        {routeCoordinates.length > 0 && (
+        {routeCoordinates.length > 0 && routeIsApproximate && (
+          <Polyline
+            path={routeCoordinates}
+            strokeOpacity={0}
+            zIndex={21}
+            icons={[
+              {
+                icon: { path: 'M 0,-1 0,1', strokeColor: '#ff860d', strokeOpacity: 1, scale: 3 },
+                offset: '0',
+                repeat: '14px',
+              },
+            ]}
+          />
+        )}
+        {routeCoordinates.length > 0 && !routeIsApproximate && (
           <>
             {/* White outline for high contrast casing */}
             <Polyline

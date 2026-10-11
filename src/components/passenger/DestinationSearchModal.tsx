@@ -23,6 +23,9 @@ import {
   AlertCircle,
   ChevronRight,
   Trash2,
+  Star,
+  Home,
+  Briefcase,
 } from 'lucide-react';
 import { LocationCoordinates, RecentDestination, PassengerLocation } from '../../types';
 import { locationService, geocodingService, GeocodingResult } from '../../services/locationService';
@@ -46,7 +49,8 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
   currentPickup,
   isSelectingPickup = false,
 }) => {
-  const { userProfile } = useAuth();
+  const { userProfile, passengerProfile } = useAuth();
+  const savedPlaces = passengerProfile?.savedPlaces || [];
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GeocodingResult[]>([]);
   const [recentDestinations, setRecentDestinations] = useState<RecentDestination[]>([]);
@@ -340,6 +344,48 @@ export const DestinationSearchModal: React.FC<DestinationSearchModalProps> = ({
         ) : (
           /* When not actively searching, show Recent Destinations & Popular Locations */
           <div className="mt-3 space-y-5">
+            {/* Saved (favourite) places from the passenger's account */}
+            {savedPlaces.length > 0 && (
+              <div>
+                <h3 className="px-2 pb-2 text-xs font-bold tracking-wider text-ink-3 uppercase flex items-center gap-1.5">
+                  <Star className="h-3.5 w-3.5 text-primary-text" />
+                  Saved Places
+                </h3>
+                <div className="space-y-1">
+                  {savedPlaces.map((place) => (
+                    <button
+                      key={place.id}
+                      onClick={() =>
+                        handleSelectPlace({
+                          address: place.address,
+                          coordinates: place.location,
+                          name: place.label,
+                        })
+                      }
+                      className="flex w-full items-center gap-3.5 rounded-card p-3 text-left hover:bg-surface-2 active:bg-surface-2 transition-all"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-primary-text">
+                        {place.icon === 'home' ? (
+                          <Home className="h-5 w-5" />
+                        ) : place.icon === 'work' ? (
+                          <Briefcase className="h-5 w-5" />
+                        ) : place.icon === 'airport' ? (
+                          <Plane className="h-5 w-5" />
+                        ) : (
+                          <Star className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-ink truncate">{place.label}</p>
+                        <p className="text-xs text-ink-2 truncate">{place.address}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-[#CCCCCC]" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Recent Destinations from Firestore */}
             {recentDestinations.length > 0 && (
               <div>

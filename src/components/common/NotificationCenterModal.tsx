@@ -51,6 +51,16 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     };
   }, [isOpen, userId]);
 
+  // Escape closes the popup (clicking outside it is handled on the backdrop below)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -102,9 +112,17 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   return createPortal(
     <div
       id="notification-center-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Notifications"
+      onClick={onClose}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="flex h-[90vh] max-h-[680px] w-full max-w-lg flex-col rounded-[20px] border border-line bg-white shadow-modal overflow-hidden text-left">
+      {/* Clicks inside the panel stay inside it; a click anywhere else closes the popup */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-[90vh] max-h-[680px] w-full max-w-lg flex-col rounded-[20px] border border-line bg-white shadow-modal overflow-hidden text-left"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-white">
           <div className="flex items-center gap-2.5">
@@ -139,6 +157,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close notifications"
               className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-ink-2 hover:bg-neutral-200"
             >
               <X className="h-4 w-4" />

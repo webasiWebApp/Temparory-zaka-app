@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { VehicleType, DriverVehicle } from '../../types';
+import { VehicleType, DriverVehicle, ACTIVE_VEHICLE_TYPES } from '../../types';
 import {
   X,
   Car,
@@ -66,7 +66,7 @@ export const BecomeDriverModal: React.FC<BecomeDriverModalProps> = ({
         year: Number(vehicleYear) || 2021,
         colour: vehicleColour.trim() || 'White',
         registrationNumber: plateClean,
-        passengerCapacity: vehicleType === 'xl' ? 6 : vehicleType === 'moto' ? 1 : 4,
+        passengerCapacity: vehicleType === 'xl' ? 6 : 4,
         status: 'pending',
       };
 
@@ -212,8 +212,8 @@ export const BecomeDriverModal: React.FC<BecomeDriverModalProps> = ({
 
               <div>
                 <label className="block text-[11px] font-bold text-ink-2 mb-1">Vehicle Tier</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(['economy', 'comfort', 'xl', 'moto'] as VehicleType[]).map((vt) => (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {ACTIVE_VEHICLE_TYPES.map((vt) => (
                     <button
                       key={vt}
                       type="button"

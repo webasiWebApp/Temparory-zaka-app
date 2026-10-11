@@ -82,8 +82,11 @@ interface AuthContextType {
     uid: string,
     details: { name: string; phone: string; email: string; photoURL?: string }
   ) => Promise<{ userProfile: UserProfile; passengerProfile: PassengerProfile }>;
+  // Without a role, an account that is not registered yet is NOT created: the call fails with
+  // code NO_ZAKA_ACCOUNT so the user can choose Passenger or Driver first.
   signInWithGoogle: (preferredRole?: UserRole) => Promise<void>;
   signInWithApple: (preferredRole?: UserRole) => Promise<void>;
+  confirmVerifiedPhone: (verifiedPhone: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfileData: (data: Partial<UserProfile>) => Promise<void>;
@@ -130,6 +133,9 @@ export const DEMO_IDENTITIES = {
 };
 
 const DEMO_DISABLED_MESSAGE = 'Demo mode is not available in this build.';
+
+/** Error code raised when a federated sign-in finds no ZAKA account and no role was chosen */
+export const NO_ZAKA_ACCOUNT = 'zaka/no-account';
 
 /** Federated providers verify the email address themselves */
 function hasVerifiedProvider(user?: FirebaseUser | null): boolean {
@@ -430,7 +436,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Check if driver or passenger doc exists
           const existingDriver = await firestoreService.getDriverProfile(uid);
           const existingPassenger = await firestoreService.getPassengerProfile(uid);
-          const detectedRole: UserRole = existingDriver ? 'driver' : 'passenger';
+          // A sign-up that was interrupted before its profile was written must come back with the role
+          // it was registering for (remembered on this device), not silently become a Rider.
+          const wasRegisteringDriver = !isRiderTarget && !existingPassenger && recallRole(uid) === 'driver';
+          const detectedRole: UserRole = existingDriver || wasRegisteringDriver ? 'driver' : 'passenger';
           const recoveredPhone = existingPassenger?.phone || userAuth.phoneNumber || '';
           uProfile = {
             uid,
@@ -444,6 +453,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: now,
           };
           await firestoreService.createUserProfile(uProfile);
+          if (detectedRole === 'driver' && !existingDriver) {
+            await firestoreService.createOrUpdateDriver({
+              userId: uid,
+              name: uProfile.name,
+              phone: recoveredPhone,
+              rating: 5.0,
+              totalTrips: 0,
+              online: false,
+              available: false,
+              verificationStatus: 'pending',
+              currentLocation: { latitude: -26.1458, longitude: 28.0416, timestamp: Date.now() },
+              earningsToday: 0,
+              earningsThisWeek: 0,
+              totalEarnings: 0,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
         }
       }
 
@@ -477,7 +504,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // Check if driver profile exists in Firestore (e.g. driver doc already registered)
-        const dProfile = await firestoreService.getDriverProfile(uid);
+        // The Rider app never loads a driver profile, so it does not spend a read looking for one
+        const dProfile = isRiderTarget ? null : await firestoreService.getDriverProfile(uid);
         if (dProfile && !userRoles.includes('driver')) {
           userRoles.push('driver');
         }
@@ -548,8 +576,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Load passenger profile ONLY if user actually has passenger role and is not purely a driver
         if ((userRoles.includes('passenger') || isRiderTarget) && uProfile.role !== 'driver') {
-          let pProfile = await firestoreService.getPassengerProfile(uid);
-          if (!pProfile) {
+          // A read failure leaves pProfile undefined: nothing is written and the profile already on
+          // screen is kept, so a network hiccup can never reset the passenger's saved data.
+          let pProfile: PassengerProfile | null | undefined;
+          try {
+            pProfile = await firestoreService.getPassengerProfile(uid);
+          } catch {
+            pProfile = undefined;
+          }
+          if (pProfile === undefined) {
+            // keep the current passenger profile
+          } else if (!pProfile) {
             pProfile = {
               userId: uid,
               name: uProfile.name || 'ZAKA Member',
@@ -557,7 +594,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               rating: 5.0,
               totalTrips: 0,
               walletBalance: 0,
-              savedPlaces: [],
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
@@ -572,7 +608,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             uProfile.phone = pProfile.phone;
             firestoreService.updateUserProfile(uid, { phone: pProfile.phone }).catch(() => {});
           }
-          setPassengerProfile(pProfile);
+          if (pProfile) setPassengerProfile(pProfile);
         } else {
           setPassengerProfile(null);
         }
@@ -663,7 +699,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (snap) => {
         if (snap.exists()) {
           const dData = snap.data() as DriverProfile;
-          setDriverProfile((prev) => ({ ...prev, ...dData }));
+          // Location and heartbeat writes land here every few seconds. They change nothing the UI
+          // reads from the profile, so they must not re-render every screen that uses the auth context.
+          const stripTelemetry = (p: any) => {
+            const { currentLocation, lastLocation, lastSeenAt, updatedAt, ...rest } = p || {};
+            return JSON.stringify(rest);
+          };
+          setDriverProfile((prev) => {
+            const next = { ...prev, ...dData };
+            return prev && stripTelemetry(prev) === stripTelemetry(next) ? prev : next;
+          });
         }
       },
       (err) => {
@@ -834,7 +879,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithProvider = async (
     providerId: 'google.com' | 'apple.com',
-    preferredRole: UserRole,
+    preferredRole: UserRole | undefined,
     defaultName: string
   ) => {
     setLoading(true);
@@ -846,8 +891,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Returning account: load it exactly like an email/password sign-in (role is read, never re-assigned)
       const existing = await firestoreService.getUserProfile(uid);
+      if (!existing && !preferredRole && !isRiderTarget) {
+        // Signing in must never create an account on the user's behalf. The session is closed and the
+        // caller sends them to registration, where they choose Passenger or Driver themselves.
+        await firebaseSignOut(auth).catch(() => {});
+        const noAccount: any = new Error(
+          `No ZAKA account is registered for this ${label} account yet. Choose Passenger or Driver to create one.`
+        );
+        noAccount.code = NO_ZAKA_ACCOUNT;
+        throw noAccount;
+      }
       if (!existing) {
         const assignedRole: UserRole = isRiderTarget ? 'passenger' : (preferredRole === 'driver' ? 'driver' : 'passenger');
+        // Remembered before any write so an interrupted sign-up is recovered with this role
+        rememberRole(uid, assignedRole);
         const now = new Date().toISOString();
         // Federated accounts do not come with a phone number: it is left empty and the user is asked
         // for it in their profile. A made-up number is never stored.
@@ -877,7 +934,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             rating: 5.0,
             totalTrips: 0,
             walletBalance: 0,
-            savedPlaces: [],
             createdAt: now,
             updatedAt: now,
           });
@@ -921,6 +977,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log(`${label} Sign In was dismissed by user.`);
         throw new Error('Sign-in cancelled.');
       }
+      if (err?.code === NO_ZAKA_ACCOUNT) {
+        throw err;
+      }
       console.error(`${label} Sign In error:`, err);
       throw new Error(getReadableAuthError(err));
     } finally {
@@ -929,10 +988,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithGoogle = (preferredRole: UserRole = 'passenger') =>
+  const signInWithGoogle = (preferredRole?: UserRole) =>
     signInWithProvider('google.com', preferredRole, 'ZAKA User');
 
-  const signInWithApple = (preferredRole: UserRole = 'passenger') =>
+  const signInWithApple = (preferredRole?: UserRole) =>
     signInWithProvider('apple.com', preferredRole, 'ZAKA User');
 
   const deleteAccount = async () => {
@@ -949,6 +1008,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .filter((d): d is NonNullable<typeof d> => Boolean(d?.storagePath))
           .map((d) => storageService.deleteDocument(d.storagePath))
       );
+      // Identity verification photos (ID document and selfie)
+      await firestoreService.deletePassengerVerificationImages(uid);
       // 1. Delete or anonymize profile data in Firestore
       await firestoreService.deleteOrAnonymizeUserProfile(uid);
       // 2. Delete the user from Firebase Auth
@@ -1157,7 +1218,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       rating: 5.0,
       totalTrips: 0,
       walletBalance: 0,
-      savedPlaces: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -1266,6 +1326,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
+        // Remembered before any profile write so an interrupted sign-up is recovered as a Driver
+        rememberRole(fbUser.uid, 'driver');
+
         // Atomically claim phone index
         try {
           await firestoreService.claimPhoneIndex(normalizedPhone, fbUser.uid);
@@ -1354,18 +1417,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           );
         }
 
-        // Wait for Firebase Auth and load driver's Firestore profile using authenticated UID
-        const [confirmedDriver, confirmedUser] = await Promise.all([
-          firestoreService.getDriverProfile(fbUser.uid).catch(() => null),
-          firestoreService.getUserProfile(fbUser.uid).catch(() => null),
-        ]);
-
-        const resolvedUserProfile: UserProfile = confirmedUser || newUserProfile;
-        const resolvedDriverProfile: DriverProfile = confirmedDriver || dProf;
-
-        setUserProfile(resolvedUserProfile);
+        // Both documents were just written above, so they are used as-is instead of being read back
+        setUserProfile(newUserProfile);
         setPassengerProfile(null);
-        setDriverProfile(resolvedDriverProfile);
+        setDriverProfile(dProf);
         setRawActiveRole('driver');
         rememberRole(fbUser.uid, 'driver');
         setCurrentUser(fbUser);
@@ -1418,6 +1473,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     await firestoreService.updatePassengerFields(passengerProfile.userId, changes);
     setPassengerProfile((prev) => (prev ? { ...prev, ...changes, updatedAt: new Date().toISOString() } : prev));
+  };
+
+  /**
+   * Records a number the user has just confirmed by SMS code (see phoneVerificationService) on their
+   * profile. The security rules only accept phoneVerified for the number held in the session token.
+   */
+  const confirmVerifiedPhone = async (verifiedPhone: string) => {
+    const phone = normalizePhoneNumber(verifiedPhone);
+    if (!phone) throw new Error('We could not confirm your phone number. Please try again.');
+    await updateUserProfileData({ phone });
+    await updatePassengerProfileData({
+      phone,
+      phoneVerified: true,
+      phoneVerifiedAt: new Date().toISOString(),
+    });
   };
 
   const updateDriverProfileData = async (data: Partial<DriverProfile>) => {
@@ -1806,6 +1876,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provisionPassengerProfile,
         signInWithGoogle,
         signInWithApple,
+        confirmVerifiedPhone,
         deleteAccount,
         resetPassword,
         updateUserProfileData,

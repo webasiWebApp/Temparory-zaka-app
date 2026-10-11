@@ -53,6 +53,18 @@ service cloud.firestore {
       return isRealAdmin();
     }
 
+    // A passenger's identity details are frozen while their submission is pending or approved
+    function passengerIdentityLocked(userId) {
+      return exists(/databases/$(database)/documents/passengers/$(userId)) &&
+        get(/databases/$(database)/documents/passengers/$(userId)).data.get('verificationStatus', 'unverified') in ['pending', 'approved'];
+    }
+
+    // Admin has approved this passenger's identity (ID document + live photo)
+    function isApprovedPassenger() {
+      return exists(/databases/$(database)/documents/passengers/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/passengers/$(request.auth.uid)).data.get('verificationStatus', 'unverified') == 'approved';
+    }
+
     function isDriver() {
       return (hasUserDoc() && getUserData().get('role', '') == 'driver') ||
              exists(/databases/$(database)/documents/drivers/$(request.auth.uid));
@@ -91,7 +103,12 @@ service cloud.firestore {
           request.resource.data.get('activeRole', 'passenger') in ['passenger', 'driver'] &&
           !request.resource.data.get('roles', []).hasAny(['admin']) &&
           request.resource.data.get('status', 'active') in [resource.data.get('status', 'active'), 'deleted'] &&
-          request.resource.data.get('accountStatus', 'active') in [resource.data.get('accountStatus', 'active'), 'deleted']
+          request.resource.data.get('accountStatus', 'active') in [resource.data.get('accountStatus', 'active'), 'deleted'] &&
+          // The name on a passenger's identity submission cannot be changed while it is pending or approved
+          (
+            request.resource.data.get('name', '') == resource.data.get('name', '') ||
+            !passengerIdentityLocked(userId)
+          )
         )
       );
       
@@ -111,6 +128,34 @@ service cloud.firestore {
     // 2. PASSENGERS COLLECTION
     // ==========================================
     match /passengers/{passengerId} {
+      function passengerChangedKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      // The review outcome belongs to Admin. A passenger may only (re)submit for review ('pending'),
+      // and the identity details are frozen while a submission is pending or approved.
+      function passengerVerificationChangeAllowed() {
+        return !passengerChangedKeys().hasAny(['verificationReviewedAt', 'verificationReviewedBy', 'rejectionReason']) &&
+          (
+            !passengerChangedKeys().hasAny(['verificationStatus']) ||
+            (
+              request.resource.data.verificationStatus == 'pending' &&
+              resource.data.get('verificationStatus', 'unverified') != 'approved'
+            )
+          ) &&
+          (
+            !(resource.data.get('verificationStatus', 'unverified') in ['pending', 'approved']) ||
+            !passengerChangedKeys().hasAny(['name', 'dateOfBirth', 'gender', 'nationality', 'idNumber'])
+          );
+      }
+
+      // 'phoneVerified' may only be true for the number confirmed by SMS code on this account
+      function passengerPhoneChangeAllowed() {
+        return !passengerChangedKeys().hasAny(['phone', 'phoneVerified']) ||
+          request.resource.data.get('phoneVerified', false) != true ||
+          request.auth.token.get('phone_number', '') == request.resource.data.get('phone', '');
+      }
+
       // Passengers read own profile; Admin reads all; Drivers CANNOT read all passengers
       allow read: if isAuthenticated() && (
         request.auth.uid == passengerId ||
@@ -126,6 +171,12 @@ service cloud.firestore {
           (
             request.resource.data.get('walletBalance', 0) == 0 ||
             request.resource.data.get('isDemo', false) == true
+          ) &&
+          // A new profile can never start out approved or with a phone number that was not confirmed
+          request.resource.data.get('verificationStatus', 'unverified') in ['unverified', 'pending'] &&
+          (
+            request.resource.data.get('phoneVerified', false) != true ||
+            request.auth.token.get('phone_number', '') == request.resource.data.get('phone', '')
           )
         ) ||
         (isAnonymous() && request.resource.data.get('isDemo', false) == true)
@@ -134,11 +185,35 @@ service cloud.firestore {
         isRealAdmin() ||
         (
           request.auth.uid == passengerId &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['walletBalance', 'isDemo'])
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['walletBalance', 'isDemo']) &&
+          passengerVerificationChangeAllowed() &&
+          passengerPhoneChangeAllowed()
         ) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalTrips', 'rating', 'totalRatings', 'ratingSum', 'updatedAt'])
+        // Trip counter only. Rating averages are written by the backend (/api/ratings/submit).
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalTrips', 'updatedAt'])
       );
       allow delete: if (isAuthenticated() && request.auth.uid == passengerId) || isRealAdmin();
+
+      // Identity verification photos (ID document + live selfie): the passenger and Admin only.
+      // They cannot be replaced while a submission is pending or approved.
+      match /verification/{imageId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid == passengerId ||
+          isRealAdmin()
+        );
+        allow create, update: if isAuthenticated() && (
+          isRealAdmin() ||
+          (
+            request.auth.uid == passengerId &&
+            imageId in ['idDocument', 'selfie'] &&
+            !passengerIdentityLocked(passengerId)
+          )
+        );
+        allow delete: if isAuthenticated() && (
+          request.auth.uid == passengerId ||
+          isRealAdmin()
+        );
+      }
     }
 
     // ==========================================
@@ -200,8 +275,8 @@ service cloud.firestore {
             )
           )
         ) ||
-        (resource.data.get('isDemo', false) == true && (isAnonymous() || isAnonymous())) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'totalRatings', 'ratingSum', 'updatedAt'])
+        // Rating averages are written by the backend (/api/ratings/submit), never by another user
+        (resource.data.get('isDemo', false) == true && (isAnonymous() || isAnonymous()))
       );
 
       allow delete: if isRealAdmin() || (isDemoAdmin() && resource.data.get('isDemo', false) == true);
@@ -402,10 +477,11 @@ service cloud.firestore {
         (resource.data.get('isDemo', false) == true && isAnonymous())
       );
 
-      // Real rides: verified account only, always start unassigned, unpaid and 'searching'
+      // Real rides: verified account with an Admin-approved identity, always start unassigned, unpaid and 'searching'
       allow create: if isAuthenticated() && (
         (
           isVerifiedAccount() &&
+          (isApprovedPassenger() || isRealAdmin()) &&
           request.resource.data.passengerId == request.auth.uid &&
           request.resource.data.get('isDemo', false) != true &&
           request.resource.data.status == 'searching' &&
@@ -560,6 +636,8 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (
         isRealAdmin() ||
         (
+          // Real ratings are created by the backend only; clients may write demo ratings
+          request.resource.data.get('isDemo', false) == true &&
           (request.auth.uid == request.resource.data.fromUserId ||
            request.auth.uid == request.resource.data.passengerId ||
            request.auth.uid == request.resource.data.driverId) &&
@@ -729,6 +807,11 @@ service cloud.firestore {
     // ==========================================
     // 17. BACKEND-ONLY SYSTEM COLLECTIONS
     // ==========================================
+    // VodaPay payment sessions hold the one-time notification secret: backend only, never a client
+    match /payment_sessions/{sessionId} {
+      allow read, write: if isRealAdmin();
+    }
+
     match /processed_webhooks/{webhookId} {
       allow read, write: if isRealAdmin();
     }

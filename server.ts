@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  * ZAKA E-Hailing Platform - Production Express Backend Server
- * Secure Server-Side Execution Layer for Peach Payments, Driver Earnings & Vite Serving
+ * Secure Server-Side Execution Layer for VodaPay, Driver Earnings & Vite Serving
  */
 
 import express from 'express';
@@ -360,145 +360,27 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Peach Payments Environment Configuration
-function getPeachConfig() {
-  const env = (process.env.PEACH_ENV || 'sandbox').toLowerCase() === 'production' ? 'production' : 'sandbox';
-  const entityId = process.env.PEACH_ENTITY_ID || '';
-  const secretToken = process.env.PEACH_SECRET_TOKEN || '';
-  const clientId = process.env.PEACH_CLIENT_ID || '';
-  const clientSecret = process.env.PEACH_CLIENT_SECRET || '';
-  const merchantId = process.env.PEACH_MERCHANT_ID || '';
-  const webhookSecret = process.env.PEACH_WEBHOOK_SECRET || '';
-  const webhookUrl = process.env.PEACH_WEBHOOK_URL || '';
-
-  const isConfigured = Boolean(entityId && secretToken);
-  const hasOAuthConfig = Boolean(clientId && clientSecret && merchantId);
-
-  const baseUrl = env === 'production'
-    ? 'https://secure.peachpayments.com'
-    : 'https://testsecure.peachpayments.com';
-
-  const authUrl = env === 'production'
-    ? 'https://dashboard.peachpayments.com/api/oauth/token'
-    : 'https://sandbox-dashboard.peachpayments.com/api/oauth/token';
+// VodaPay Gateway configuration (Vodacom Financial Services)
+//   sandbox    -> UAT host with the "test: true" header (virtual test cards, no bank involved)
+//   uat        -> UAT host, real bank test cards with 3-D Secure
+//   production -> live host, real money
+function getGatewayConfig() {
+  const rawEnv = (process.env.VODAPAY_ENV || 'sandbox').toLowerCase();
+  const env: 'sandbox' | 'uat' | 'production' = rawEnv === 'production' ? 'production' : rawEnv === 'uat' ? 'uat' : 'sandbox';
+  const apiKey = (process.env.VODAPAY_API_KEY || '').trim();
+  const defaultBase =
+    env === 'production'
+      ? 'https://api.vodapaygateway.vodacom.co.za/V3'
+      : 'https://api.vodapaygatewayuat.vodacom.co.za/V3';
+  const baseUrl = (process.env.VODAPAY_BASE_URL || defaultBase).replace(/\/+$/, '');
 
   return {
     env,
-    entityId,
-    secretToken,
-    clientId,
-    clientSecret,
-    merchantId,
-    webhookSecret,
-    webhookUrl,
-    isConfigured,
-    hasOAuthConfig,
+    apiKey,
     baseUrl,
-    authUrl,
+    testHeader: env === 'sandbox' ? 'true' : 'false',
+    isConfigured: Boolean(apiKey),
   };
-}
-
-// In-memory cache for Peach OAuth v2 token
-interface PeachTokenCache {
-  accessToken: string;
-  expiresAt: number;
-}
-let cachedPeachToken: PeachTokenCache | null = null;
-
-/**
- * Obtains an OAuth access token from Peach's authentication service using clientId, clientSecret, and merchantId
- */
-async function getPeachAccessToken(): Promise<string | null> {
-  const peach = getPeachConfig();
-  if (!peach.hasOAuthConfig) {
-    return null;
-  }
-
-  // Reuse cached token if valid for at least 60 seconds
-  if (cachedPeachToken && Date.now() < cachedPeachToken.expiresAt - 60000) {
-    return cachedPeachToken.accessToken;
-  }
-
-  try {
-    const response = await fetch(peach.authUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        clientId: peach.clientId,
-        clientSecret: peach.clientSecret,
-        merchantId: peach.merchantId,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn(`[ZAKA Server] Peach OAuth token request failed (${response.status}):`, errorText);
-      return null;
-    }
-
-    const data = await response.json();
-    if (data?.access_token) {
-      const expiresIn = Number(data.expires_in) || 86400;
-      cachedPeachToken = {
-        accessToken: data.access_token,
-        expiresAt: Date.now() + expiresIn * 1000,
-      };
-      return data.access_token;
-    }
-  } catch (err: any) {
-    console.warn('[ZAKA Server] Error obtaining Peach OAuth token:', err.message);
-  }
-
-  return null;
-}
-
-// Replay and idempotency cache for Webhook IDs
-const processedWebhookIds = new Set<string>();
-
-async function isWebhookAlreadyProcessed(webhookId: string): Promise<boolean> {
-  if (processedWebhookIds.has(webhookId)) {
-    return true;
-  }
-  try {
-    const docRef = doc(db, 'processed_webhooks', webhookId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      processedWebhookIds.add(webhookId);
-      return true;
-    }
-  } catch (e) {
-    console.warn('[ZAKA Webhook] Failed checking processed webhook status in Firestore:', e);
-  }
-  return false;
-}
-
-async function markWebhookProcessed(webhookId: string, eventType?: string): Promise<void> {
-  processedWebhookIds.add(webhookId);
-  try {
-    const docRef = doc(db, 'processed_webhooks', webhookId);
-    await setDoc(docRef, {
-      webhookId,
-      eventType: eventType || 'payment_event',
-      processedAt: new Date().toISOString(),
-    });
-  } catch (e) {
-    console.warn('[ZAKA Webhook] Failed recording processed webhook in Firestore:', e);
-  }
-}
-
-/**
- * Calculates HMAC-SHA256 signature for Peach Payments Checkout v2
- * Sorted parameter keys concatenated without spaces
- */
-function calculatePeachSignature(params: Record<string, string>, secretKey: string): string {
-  const sortedKeys = Object.keys(params).sort();
-  let toSign = '';
-  for (const key of sortedKeys) {
-    toSign += key + params[key];
-  }
-  return crypto.createHmac('sha256', secretKey).update(toSign).digest('hex');
 }
 
 // ============================================================================
@@ -960,6 +842,8 @@ async function purgeUserData(uid: string): Promise<void> {
   await removeAll(collection(db, 'users', uid, 'recentDestinations'));
   await removeAll(query(collection(db, 'phoneIndex'), where('uid', '==', uid), limit(20)));
   await removeAll(collection(db, 'drivers', uid, 'documents'));
+  // Passenger identity verification photos (ID document and live photo)
+  await removeAll(collection(db, 'passengers', uid, 'verification'));
   await removeAll(collection(db, 'driverCompliance', uid, 'documents'));
   await removeAll(query(collection(db, 'driver_document_contents'), where('driverId', '==', uid), limit(50)));
 
@@ -1484,7 +1368,7 @@ async function settleRide(rideId: string, ride: any): Promise<Record<string, any
     platformCommission,
     platformFee: platformCommission,
     driverEarnings,
-    provider: method === 'cash' ? 'cash' : method === 'wallet' ? 'zaka-wallet' : 'peach',
+    provider: method === 'cash' ? 'cash' : method === 'wallet' ? 'zaka-wallet' : 'vodapay',
     transactionReference: existing.data?.transactionReference || `ZAK-${Date.now().toString(36).toUpperCase()}`,
     isDemo: Boolean(ride.isDemo),
     settledByServer: true,
@@ -1547,7 +1431,7 @@ async function settleRide(rideId: string, ride: any): Promise<Record<string, any
       );
     }
   } else {
-    // Cash: confirmed by the driver. Card / digital: confirmed by Peach (verify endpoint or webhook).
+    // Cash: confirmed by the driver. Card / digital: confirmed by VodaPay (verify endpoint or webhook).
     await setDoc(
       existing.ref,
       { ...record, paymentStatus: existing.data?.paymentStatus || 'pending', paidAt: existing.data?.paidAt || null },
@@ -1614,28 +1498,129 @@ app.post('/api/rides/settle', rateLimit(60000, 30), async (req: Request, res: Re
   }
 });
 
+// 3d-2. Ratings — recorded by the server so that only a participant of a completed ride can rate,
+// once per ride, and nobody can edit another user's rating average directly.
+app.post('/api/ratings/submit', rateLimit(60000, 20), async (req: Request, res: Response) => {
+  try {
+    const tokenUser = await verifyFirebaseIdToken(req);
+    if (!tokenUser) {
+      res.status(401).json({ success: false, error: 'Authentication required.' });
+      return;
+    }
+    const { rideId, rating, comment, tip } = req.body || {};
+    const stars = Number(rating);
+    if (!rideId || typeof rideId !== 'string' || !SAFE_ID_PATTERN.test(rideId)) {
+      res.status(400).json({ success: false, error: 'rideId is required' });
+      return;
+    }
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+      res.status(400).json({ success: false, error: 'Rating must be a whole number from 1 to 5.' });
+      return;
+    }
+
+    await ensureBackendAuthenticated();
+    const rideSnap = await getDoc(doc(db, 'rides', rideId));
+    if (!rideSnap.exists()) {
+      res.status(404).json({ success: false, error: 'Ride not found' });
+      return;
+    }
+    const ride: any = rideSnap.data();
+    const fromPassenger = tokenUser.uid === ride.passengerId;
+    const fromDriver = tokenUser.uid === ride.driverId;
+    if (!fromPassenger && !fromDriver) {
+      res.status(403).json({ success: false, error: 'You are not a participant of this ride.' });
+      return;
+    }
+    if (ride.status !== 'completed') {
+      res.status(400).json({ success: false, error: 'A ride can only be rated once it is completed.' });
+      return;
+    }
+    const toUserId: string = fromPassenger ? ride.driverId : ride.passengerId;
+    if (!toUserId) {
+      res.status(400).json({ success: false, error: 'This ride has nobody to rate.' });
+      return;
+    }
+
+    // Ratings saved before this endpoint existed used generated ids
+    const legacy = await getDocs(
+      query(collection(db, 'ratings'), where('rideId', '==', rideId), where('fromUserId', '==', tokenUser.uid), limit(1))
+    );
+    if (!legacy.empty) {
+      res.json({ success: true, alreadyRated: true });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const ratingRef = doc(db, 'ratings', `${rideId}_${tokenUser.uid}`);
+    const targetRef = doc(db, fromPassenger ? 'drivers' : 'passengers', toUserId);
+    let alreadyRated = false;
+
+    await runTransaction(db, async (tx) => {
+      const existingRating = await tx.get(ratingRef);
+      if (existingRating.exists()) {
+        alreadyRated = true;
+        return;
+      }
+      const targetSnap = await tx.get(targetRef);
+      tx.set(ratingRef, {
+        rideId,
+        passengerId: ride.passengerId,
+        driverId: ride.driverId,
+        fromUserId: tokenUser.uid,
+        toUserId,
+        fromRole: fromPassenger ? 'passenger' : 'driver',
+        toRole: fromPassenger ? 'driver' : 'passenger',
+        rating: stars,
+        comment: typeof comment === 'string' ? comment.slice(0, 500) : '',
+        tip: fromPassenger ? Math.min(Math.max(round2(Number(tip) || 0), 0), 10000) : 0,
+        isDemo: Boolean(ride.isDemo),
+        createdAt: nowIso,
+      });
+      if (targetSnap.exists() && !ride.isDemo) {
+        const target: any = targetSnap.data();
+        const previousCount = Number(target.totalRatings) || 0;
+        const previousSum =
+          target.ratingSum !== undefined ? Number(target.ratingSum) || 0 : (Number(target.rating) || 5) * previousCount;
+        const ratingSum = previousSum + stars;
+        const totalRatings = previousCount + 1;
+        tx.update(targetRef, {
+          rating: Number((ratingSum / totalRatings).toFixed(1)),
+          totalRatings,
+          ratingSum,
+          updatedAt: nowIso,
+        });
+      }
+    });
+
+    res.json({ success: true, alreadyRated });
+  } catch (err: any) {
+    console.error('[ZAKA Server] /api/ratings/submit error:', err);
+    res.status(500).json({ success: false, error: 'Could not save the rating' });
+  }
+});
+
 // 3e. Public Gateway Configuration (NO SECRETS EXPOSED)
 app.get('/api/payments/config', (_req: Request, res: Response) => {
-  const peach = getPeachConfig();
+  const gateway = getGatewayConfig();
   res.json({
-    provider: 'peach',
-    env: peach.env,
-    isConfigured: peach.isConfigured,
+    provider: 'vodapay',
+    env: gateway.env,
+    isConfigured: gateway.isConfigured,
     currency: 'ZAR',
     commissionSplit: {
       driverPercent: 100 - PLATFORM_COMMISSION_PERCENT,
       platformPercent: PLATFORM_COMMISSION_PERCENT,
     },
-    message: peach.isConfigured
-      ? `Peach Payments active in ${peach.env.toUpperCase()} mode.`
+    message: gateway.isConfigured
+      ? `VodaPay Gateway active in ${gateway.env.toUpperCase()} mode.`
       : 'Card payments are not available yet. Please pay with cash or your ZAKA wallet.',
   });
 });
 
 // ---------------------------------------------------------------------------
-// Peach Payments helpers
+// VodaPay Gateway helpers
 // ---------------------------------------------------------------------------
-const PEACH_SUCCESS_PATTERN = /^(000\.000\.|000\.100\.1|000\.[36]|000\.400\.0[^3]|000\.400\.100)/;
+const GATEWAY_SUCCESS_CODE = '00';
 
 function publicBaseUrl(req: Request): string {
   if (process.env.APP_PUBLIC_URL) return process.env.APP_PUBLIC_URL.replace(/\/+$/, '');
@@ -1643,85 +1628,85 @@ function publicBaseUrl(req: Request): string {
   return `${req.protocol === 'https' ? 'https' : 'http'}://${host}`;
 }
 
-function newMerchantTransactionId(prefix: string, seed: string): string {
-  // Peach merchantTransactionId: 8-16 alphanumeric characters
-  const short = seed.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase();
-  return `${prefix}${short}${crypto.randomBytes(4).toString('hex').toUpperCase()}`.slice(0, 16);
+function newTraceId(prefix: string, seed: string): string {
+  // VodaPay traceId: 12-99 characters, unique per request
+  const short = seed.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase();
+  return `${prefix}${short}${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
-async function createPeachCheckout(params: {
+function sha256Hex(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+/**
+ * Opens a VodaPay hosted payment session.
+ *
+ * VodaPay does not sign its notifications and has no "query this transaction" call, so the result
+ * is authenticated with a one-time secret: a random token is placed in the notification URL, which
+ * only this server and VodaPay ever see (the payer's browser gets the callback URL, never this one).
+ * The session and the token hash are kept in /payment_sessions, a backend-only collection, so a
+ * client can neither read the secret nor swap in a session of their own.
+ */
+async function createGatewaySession(params: {
+  req: Request;
+  kind: 'ride' | 'topup';
+  targetId: string;
+  userId: string;
   amount: number;
-  merchantTransactionId: string;
-  shopperResultUrl: string;
-}): Promise<{ ok: boolean; redirectUrl?: string; checkoutId?: string; details?: string }> {
-  const peach = getPeachConfig();
-  const checkoutParams: Record<string, string> = {
-    'authentication.entityId': peach.entityId,
-    amount: params.amount.toFixed(2),
-    currency: 'ZAR',
-    merchantTransactionId: params.merchantTransactionId,
-    nonce: crypto.randomUUID(),
-    paymentType: 'DB',
-    shopperResultUrl: params.shopperResultUrl,
-  };
-  checkoutParams['signature'] = calculatePeachSignature(checkoutParams, peach.secretToken);
+  traceId: string;
+  returnQuery: string;
+}): Promise<{ ok: boolean; redirectUrl?: string; sessionId?: string; transactionId?: string; details?: string }> {
+  const gateway = getGatewayConfig();
+  const notifyToken = crypto.randomBytes(32).toString('hex');
+  const base = publicBaseUrl(params.req);
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const accessToken = await getPeachAccessToken();
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-  const response = await fetch(`${peach.baseUrl}/v2/checkout`, {
+  const response = await fetch(`${gateway.baseUrl}/Pay/OnceOff`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify(checkoutParams),
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      'api-key': gateway.apiKey,
+      test: gateway.testHeader,
+    },
+    body: JSON.stringify({
+      echoData: `${params.kind}:${params.targetId}`,
+      traceId: params.traceId,
+      amount: Math.round(params.amount * 100), // cents
+      delaySettlement: false,
+      notifications: {
+        callbackUrl: `${base}/api/payments/vodapay/return?${params.returnQuery}`,
+        notificationUrl: `${base}/api/payments/vodapay/notify?t=${notifyToken}`,
+      },
+    }),
     signal: AbortSignal.timeout(20000),
   });
-  const data: any = await response.json().catch(() => ({}));
-  if (!response.ok || (!data.redirectUrl && !data.id)) {
-    console.warn('[ZAKA Server] Peach checkout response error:', data);
-    return { ok: false, details: data?.result?.description || data?.message || 'Gateway rejected checkout request' };
+  const body: any = await response.json().catch(() => ({}));
+  const data = body?.data || {};
+  if (!response.ok || !body?.succeeded || data.responseCode !== GATEWAY_SUCCESS_CODE || !data.initiationUrl || !data.sessionId) {
+    console.warn(`[ZAKA Server] VodaPay session request failed (HTTP ${response.status}):`, data.responseMessage || body?.title || body);
+    return {
+      ok: false,
+      details:
+        response.status === 401 || response.status === 403
+          ? 'VodaPay rejected the API key for this environment.'
+          : data.responseMessage || body?.title || 'Gateway rejected the payment request',
+    };
   }
-  return { ok: true, redirectUrl: data.redirectUrl, checkoutId: data.id || data.checkoutId };
-}
 
-async function fetchPeachCheckoutStatus(checkoutId: string): Promise<{
-  isSuccess: boolean;
-  resultCode: string;
-  description: string;
-  providerId: string;
-  amount: number | null;
-  merchantTransactionId: string;
-}> {
-  const peach = getPeachConfig();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const accessToken = await getPeachAccessToken();
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-  const url = `${peach.baseUrl}/v2/checkout/${encodeURIComponent(checkoutId)}?entityId=${encodeURIComponent(peach.entityId)}`;
-  const response = await fetch(url, { headers, signal: AbortSignal.timeout(20000) });
-  const data: any = await response.json().catch(() => ({}));
-  const resultCode = data?.result?.code || '';
-  return {
-    isSuccess: PEACH_SUCCESS_PATTERN.test(resultCode),
-    resultCode,
-    description: data?.result?.description || '',
-    providerId: data?.id || data?.registrationId || checkoutId,
-    amount: data?.amount !== undefined && data?.amount !== null && !isNaN(Number(data.amount)) ? Number(data.amount) : null,
-    merchantTransactionId: data?.merchantTransactionId || '',
-  };
-}
+  await setDoc(doc(db, 'payment_sessions', data.sessionId), {
+    kind: params.kind,
+    targetId: params.targetId,
+    userId: params.userId,
+    amountCents: Math.round(params.amount * 100),
+    traceId: params.traceId,
+    transactionId: data.transactionId || '',
+    notifyTokenHash: sha256Hex(notifyToken),
+    status: 'pending',
+    env: gateway.env,
+    createdAt: new Date().toISOString(),
+  });
 
-/** A gateway confirmation only counts if it is for the transaction and amount we created. */
-function gatewayResultMatches(
-  expected: { amount: number; merchantTransactionId?: string },
-  actual: { amount: number | null; merchantTransactionId: string }
-): boolean {
-  if (actual.merchantTransactionId && expected.merchantTransactionId && actual.merchantTransactionId !== expected.merchantTransactionId) {
-    return false;
-  }
-  if (actual.amount !== null && Math.abs(actual.amount - Number(expected.amount)) > 0.009) {
-    return false;
-  }
-  return true;
+  return { ok: true, redirectUrl: data.initiationUrl, sessionId: data.sessionId, transactionId: data.transactionId || '' };
 }
 
 /** Marks a card payment and its ride as paid exactly once. Returns true only on the first confirmation. */
@@ -1739,7 +1724,7 @@ async function finalizeRidePayment(paymentRef: any, providerTransactionId: strin
       paidAt: nowIso,
       updatedAt: nowIso,
       failureReason: null,
-      providerTransactionId: providerTransactionId || payment.peachCheckoutId || '',
+      providerTransactionId: providerTransactionId || payment.gatewayTransactionId || '',
     });
     tx.update(doc(db, 'rides', payment.rideId), { paymentStatus: 'paid', updatedAt: nowIso });
     transitioned = true;
@@ -1747,7 +1732,7 @@ async function finalizeRidePayment(paymentRef: any, providerTransactionId: strin
   if (transitioned && payment) {
     const amount = Number(payment.amount) || 0;
     const earnings = Number(payment.driverEarnings) || splitFare(amount).driverEarnings;
-    await pushNotification(payment.passengerId, 'Payment Successful ✓', `Payment of R${amount.toFixed(2)} confirmed via Peach Payments. Thank you for riding with ZAKA!`);
+    await pushNotification(payment.passengerId, 'Payment Successful ✓', `Payment of R${amount.toFixed(2)} confirmed via VodaPay. Thank you for riding with ZAKA!`);
     await pushNotification(payment.driverId, 'Payment Confirmed', `Payment of R${amount.toFixed(2)} confirmed. Your earnings: R${earnings.toFixed(2)}.`);
   }
   return transitioned;
@@ -1784,7 +1769,7 @@ async function creditWalletTopup(transactionId: string, providerTransactionId: s
 const WALLET_TOPUP_MIN = 20;
 const WALLET_TOPUP_MAX = 5000;
 
-// 3f. Start a wallet top-up through Peach Hosted Checkout
+// 3f. Start a wallet top-up through VodaPay hosted checkout
 app.post('/api/wallet/topup/initiate', rateLimit(60000, 6), async (req: Request, res: Response) => {
   try {
     const tokenUser = await verifyFirebaseIdToken(req);
@@ -1802,11 +1787,10 @@ app.post('/api/wallet/topup/initiate', rateLimit(60000, 6), async (req: Request,
       return;
     }
 
-    const peach = getPeachConfig();
-    if (!peach.isConfigured) {
+    if (!getGatewayConfig().isConfigured) {
       res.json({
         success: false,
-        code: 'PEACH_CREDENTIALS_REQUIRED',
+        code: 'GATEWAY_NOT_CONFIGURED',
         message: 'Wallet top-ups are not available yet because card payments have not been activated.',
       });
       return;
@@ -1814,14 +1798,18 @@ app.post('/api/wallet/topup/initiate', rateLimit(60000, 6), async (req: Request,
 
     await ensureBackendAuthenticated();
     const transactionId = `WTX-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-    const merchantTransactionId = newMerchantTransactionId('ZW', tokenUser.uid);
-    const checkout = await createPeachCheckout({
+    const traceId = newTraceId('ZW', tokenUser.uid);
+    const session = await createGatewaySession({
+      req,
+      kind: 'topup',
+      targetId: transactionId,
+      userId: tokenUser.uid,
       amount,
-      merchantTransactionId,
-      shopperResultUrl: `${publicBaseUrl(req)}/api/payments/peach/return?walletTx=${encodeURIComponent(transactionId)}`,
+      traceId,
+      returnQuery: `walletTx=${encodeURIComponent(transactionId)}`,
     });
-    if (!checkout.ok) {
-      res.status(502).json({ success: false, error: 'Payment gateway communication error', details: checkout.details });
+    if (!session.ok) {
+      res.status(502).json({ success: false, error: 'Payment gateway communication error', details: session.details });
       return;
     }
 
@@ -1832,21 +1820,22 @@ app.post('/api/wallet/topup/initiate', rateLimit(60000, 6), async (req: Request,
       amount,
       currency: 'ZAR',
       status: 'pending',
-      provider: 'peach',
-      merchantTransactionId,
-      peachCheckoutId: checkout.checkoutId || '',
+      provider: 'vodapay',
+      merchantTransactionId: traceId,
+      gatewaySessionId: session.sessionId || '',
       description: 'Wallet top-up',
       createdAt: new Date().toISOString(),
     });
 
-    res.json({ success: true, transactionId, redirectUrl: checkout.redirectUrl, amount });
+    res.json({ success: true, transactionId, redirectUrl: session.redirectUrl, amount });
   } catch (err: any) {
     console.error('[ZAKA Server] /api/wallet/topup/initiate error:', err);
     res.status(500).json({ success: false, error: 'Could not start the top-up' });
   }
 });
 
-// 3g. Confirm a wallet top-up with Peach (server-to-server) and credit the balance
+// 3g. Report whether a wallet top-up has been confirmed. The balance is only ever credited by the
+// VodaPay notification handler below; this endpoint just reads the outcome.
 app.post('/api/wallet/topup/verify', rateLimit(60000, 20), async (req: Request, res: Response) => {
   try {
     const tokenUser = await verifyFirebaseIdToken(req);
@@ -1870,17 +1859,11 @@ app.post('/api/wallet/topup/verify', rateLimit(60000, 20), async (req: Request, 
       res.json({ success: true, status: 'completed', amount: info.amount });
       return;
     }
-    if (!getPeachConfig().isConfigured || !info.peachCheckoutId) {
-      res.json({ success: false, status: info.status, message: 'Awaiting payment confirmation.' });
-      return;
-    }
-    const status = await fetchPeachCheckoutStatus(info.peachCheckoutId);
-    if (status.isSuccess && gatewayResultMatches(info, status)) {
-      await creditWalletTopup(transactionId, status.providerId);
-      res.json({ success: true, status: 'completed', amount: info.amount });
-      return;
-    }
-    res.json({ success: false, status: info.status, resultCode: status.resultCode, message: status.description || 'Payment not completed yet.' });
+    res.json({
+      success: false,
+      status: info.status,
+      message: info.failureReason || 'Awaiting payment confirmation from VodaPay.',
+    });
   } catch (err: any) {
     console.error('[ZAKA Server] /api/wallet/topup/verify error:', err);
     res.status(500).json({ success: false, error: 'Could not verify the top-up' });
@@ -1891,8 +1874,8 @@ app.post('/api/wallet/topup/verify', rateLimit(60000, 20), async (req: Request, 
 // Card payments
 // ---------------------------------------------------------------------------
 
-// 3. Initiate Electronic Payment (Peach Hosted Checkout)
-app.post('/api/payments/peach/initiate', rateLimit(60000, 10), async (req: Request, res: Response) => {
+// 3. Initiate Electronic Payment (VodaPay hosted checkout)
+app.post('/api/payments/card/initiate', rateLimit(60000, 10), async (req: Request, res: Response) => {
   try {
     const tokenUser = await verifyFirebaseIdToken(req);
     if (!tokenUser) {
@@ -1945,14 +1928,11 @@ app.post('/api/payments/peach/initiate', rateLimit(60000, 10), async (req: Reque
       return;
     }
 
-    const merchantTransactionId = newMerchantTransactionId('ZK', rideId);
-    const peach = getPeachConfig();
-
-    if (!peach.isConfigured) {
-      await setDoc(payment.ref, { failureReason: 'PEACH_CREDENTIALS_REQUIRED', updatedAt: new Date().toISOString() }, { merge: true });
+    if (!getGatewayConfig().isConfigured) {
+      await setDoc(payment.ref, { failureReason: 'GATEWAY_NOT_CONFIGURED', updatedAt: new Date().toISOString() }, { merge: true });
       res.json({
         success: false,
-        code: 'PEACH_CREDENTIALS_REQUIRED',
+        code: 'GATEWAY_NOT_CONFIGURED',
         message: 'Card payments are not available yet. Please pay your driver in cash.',
         paymentStatus: 'pending',
         amount,
@@ -1961,23 +1941,29 @@ app.post('/api/payments/peach/initiate', rateLimit(60000, 10), async (req: Reque
       return;
     }
 
-    const checkout = await createPeachCheckout({
+    const traceId = newTraceId('ZK', rideId);
+    const session = await createGatewaySession({
+      req,
+      kind: 'ride',
+      targetId: rideId,
+      userId: tokenUser.uid,
       amount,
-      merchantTransactionId,
-      shopperResultUrl: `${publicBaseUrl(req)}/api/payments/peach/return?rideId=${encodeURIComponent(rideId)}`,
+      traceId,
+      returnQuery: `rideId=${encodeURIComponent(rideId)}`,
     });
-    if (!checkout.ok) {
-      res.status(502).json({ success: false, error: 'Payment gateway communication error', details: checkout.details });
+    if (!session.ok) {
+      res.status(502).json({ success: false, error: 'Payment gateway communication error', details: session.details });
       return;
     }
 
     await setDoc(
       payment.ref,
       {
-        transactionReference: merchantTransactionId,
-        merchantTransactionId,
-        peachCheckoutId: checkout.checkoutId || '',
-        redirectUrl: checkout.redirectUrl || '',
+        transactionReference: traceId,
+        merchantTransactionId: traceId,
+        gatewaySessionId: session.sessionId || '',
+        gatewayTransactionId: session.transactionId || '',
+        redirectUrl: session.redirectUrl || '',
         failureReason: null,
         updatedAt: new Date().toISOString(),
       },
@@ -1987,20 +1973,21 @@ app.post('/api/payments/peach/initiate', rateLimit(60000, 10), async (req: Reque
     res.json({
       success: true,
       paymentStatus: 'pending',
-      redirectUrl: checkout.redirectUrl,
-      peachCheckoutId: checkout.checkoutId,
-      merchantTransactionId,
+      redirectUrl: session.redirectUrl,
+      gatewaySessionId: session.sessionId,
+      merchantTransactionId: traceId,
       amount,
       paymentId: payment.id,
     });
   } catch (err: any) {
-    console.error('[ZAKA Server] /api/payments/peach/initiate error:', err);
+    console.error('[ZAKA Server] /api/payments/card/initiate error:', err);
     res.status(500).json({ success: false, error: 'Could not start the payment' });
   }
 });
 
-// 4. Secure Payment Verification (Server-to-Server Confirmation)
-app.post('/api/payments/peach/verify', rateLimit(60000, 30), async (req: Request, res: Response) => {
+// 4. Report whether a card payment has been confirmed. A payment is only ever marked paid by the
+// VodaPay notification handler below; nothing the browser sends can confirm it.
+app.post('/api/payments/card/verify', rateLimit(60000, 30), async (req: Request, res: Response) => {
   try {
     const tokenUser = await verifyFirebaseIdToken(req);
     if (!tokenUser) {
@@ -2038,162 +2025,116 @@ app.post('/api/payments/peach/verify', rateLimit(60000, 30), async (req: Request
       return;
     }
 
-    if (!getPeachConfig().isConfigured) {
-      res.json({ success: false, paymentStatus: payment.paymentStatus || 'pending', message: 'Card payments are not available yet.' });
-      return;
-    }
-
-    // Only the checkout this server created for this ride is ever consulted -
-    // a checkout id supplied by the caller is ignored so another payment cannot be substituted.
-    if (!payment.peachCheckoutId) {
-      res.json({ success: false, paymentStatus: 'pending', message: 'Awaiting checkout completion.' });
-      return;
-    }
-
-    const status = await fetchPeachCheckoutStatus(payment.peachCheckoutId);
-    if (status.isSuccess && gatewayResultMatches(payment, status)) {
-      await finalizeRidePayment(found.ref, status.providerId);
-      res.json({ success: true, paymentStatus: 'paid', paidAt: new Date().toISOString(), amount: payment.amount });
-      return;
-    }
-    if (status.isSuccess) {
-      console.error(`[ZAKA Server] Peach confirmation for ride ${rideId} does not match the expected amount/transaction. Not finalised.`);
-    }
-
     res.json({
       success: false,
       paymentStatus: payment.paymentStatus || 'pending',
-      resultCode: status.resultCode,
-      message: status.description || 'Transaction pending or not completed',
+      message:
+        payment.failureReason && payment.failureReason !== 'GATEWAY_NOT_CONFIGURED'
+          ? String(payment.failureReason)
+          : 'Awaiting payment confirmation from VodaPay.',
     });
   } catch (err: any) {
-    console.error('[ZAKA Server] /api/payments/peach/verify error:', err);
+    console.error('[ZAKA Server] /api/payments/card/verify error:', err);
     res.status(500).json({ success: false, error: 'Could not verify the payment' });
   }
 });
 
-// 5. Signed Peach Payments Webhook Endpoint
-// Implements Peach Payments Webhook Signature specification:
-// Headers: x-webhook-timestamp, x-webhook-id, x-webhook-signature, x-webhook-signature-algorithm
-// Signature message: timestamp.webhookId.webhookURL.rawRequestBody signed with PEACH_WEBHOOK_SECRET
-app.post('/api/payments/peach/webhook', rateLimit(60000, 120), async (req: Request, res: Response) => {
+// 5. VodaPay server-to-server notification
+// Authenticated by the one-time token in the URL (see createGatewaySession), then checked against
+// the session this server opened: same session, same VodaPay transaction, same amount.
+app.post('/api/payments/vodapay/notify', rateLimit(60000, 120), async (req: Request, res: Response) => {
   try {
-    const timestamp = req.get('x-webhook-timestamp') || '';
-    const webhookId = req.get('x-webhook-id') || '';
-    const receivedSignature = req.get('x-webhook-signature') || req.get('x-signature') || '';
-    const rawRequestBody = (req as any).rawBody || JSON.stringify(req.body);
-
-    const peach = getPeachConfig();
-
-    // 1. An unsigned webhook can never confirm a payment. Without a configured secret the endpoint is closed.
-    if (!peach.webhookSecret) {
-      console.warn('[ZAKA Webhook] Rejected: PEACH_WEBHOOK_SECRET is not configured.');
-      res.status(503).json({ error: 'Webhook processing is not configured' });
-      return;
-    }
-    if (!receivedSignature || !timestamp || !webhookId) {
-      console.warn('[ZAKA Webhook] Missing required webhook authentication headers');
-      res.status(401).json({ error: 'Missing webhook signature headers' });
+    const token = typeof req.query.t === 'string' ? req.query.t : '';
+    const payload: any = req.body || {};
+    const sessionId = String(payload.sessionId || '');
+    if (!/^[a-f0-9]{64}$/.test(token) || !SAFE_ID_PATTERN.test(sessionId)) {
+      res.status(400).json({ error: 'Invalid notification' });
       return;
     }
 
-    // Replay attack prevention: timestamp must parse and be within 5 minutes
-    const parsedTimestamp = /^\d+$/.test(timestamp)
-      ? (timestamp.length <= 10 ? Number(timestamp) * 1000 : Number(timestamp))
-      : Date.parse(timestamp);
-    if (!parsedTimestamp || isNaN(parsedTimestamp) || Math.abs(Date.now() - parsedTimestamp) > 5 * 60 * 1000) {
-      console.warn('[ZAKA Webhook] Webhook timestamp missing, invalid or outside the 5-minute tolerance window');
-      res.status(400).json({ error: 'Webhook timestamp expired or invalid' });
+    await ensureBackendAuthenticated();
+    const sessionRef = doc(db, 'payment_sessions', sessionId);
+    const sessionSnap = await getDoc(sessionRef);
+    if (!sessionSnap.exists()) {
+      res.status(404).json({ error: 'Unknown payment session' });
+      return;
+    }
+    const session: any = sessionSnap.data();
+
+    const given = Buffer.from(sha256Hex(token), 'hex');
+    const expected = Buffer.from(String(session.notifyTokenHash || ''), 'hex');
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+      console.warn(`[ZAKA VodaPay] Notification for session ${sessionId} rejected: token mismatch.`);
+      res.status(401).json({ error: 'Invalid notification token' });
       return;
     }
 
-    // Format: timestamp.webhookId.webhookURL.rawRequestBody
-    const configuredWebhookUrl = peach.webhookUrl || `${publicBaseUrl(req)}/api/payments/peach/webhook`;
-    const expectedSignature = crypto
-      .createHmac('sha256', peach.webhookSecret)
-      .update(`${timestamp}.${webhookId}.${configuredWebhookUrl}.${rawRequestBody}`)
-      .digest('hex');
+    const responseCode = String(payload.responseCode || '');
+    const nowIso = new Date().toISOString();
+    const providerTransactionId = String(payload.transactionId || session.transactionId || '');
+    const amountMatches = Number(payload.transactionAmount) === Number(session.amountCents);
+    const transactionMatches = !session.transactionId || !payload.transactionId || payload.transactionId === session.transactionId;
 
-    // Constant-time comparison to prevent timing attacks
-    const sigBuf = Buffer.from(receivedSignature, 'hex');
-    const expBuf = Buffer.from(expectedSignature, 'hex');
-    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-      console.warn('[ZAKA Webhook] HMAC-SHA256 signature verification failed');
-      res.status(401).json({ error: 'Invalid webhook signature' });
-      return;
-    }
-
-    // 2. Replay & Idempotency Protection by Webhook ID
-    if (await isWebhookAlreadyProcessed(webhookId)) {
+    if (session.status === 'paid') {
       res.status(200).json({ received: true, status: 'already_processed' });
       return;
     }
 
-    const payload = req.body || {};
-    console.log('[ZAKA Webhook] Received verified Peach Payments event:', payload?.event || payload?.type);
-
-    const merchantTransactionId = String(payload.merchantTransactionId || payload.data?.merchantTransactionId || '');
-    const resultCode = payload.result?.code || payload.data?.result?.code || '';
-    const rawAmount = payload.amount ?? payload.data?.amount;
-    const reported = {
-      amount: rawAmount !== undefined && rawAmount !== null && !isNaN(Number(rawAmount)) ? Number(rawAmount) : null,
-      merchantTransactionId,
-    };
-    const providerId = String(payload.id || payload.data?.id || '');
-
-    if (merchantTransactionId && PEACH_SUCCESS_PATTERN.test(resultCode)) {
-      await ensureBackendAuthenticated();
-
-      const paySnap = await getDocs(
-        query(collection(db, 'payments'), where('merchantTransactionId', '==', merchantTransactionId), limit(1))
-      );
-      if (!paySnap.empty) {
-        const pDoc = paySnap.docs[0];
-        if (gatewayResultMatches(pDoc.data() as any, reported)) {
-          if (await finalizeRidePayment(pDoc.ref, providerId)) {
-            console.log(`[ZAKA Webhook] Finalized payment for ride ${pDoc.data().rideId}`);
-          }
-        } else {
-          console.error(`[ZAKA Webhook] Amount mismatch for ${merchantTransactionId}. Payment NOT finalised.`);
-        }
+    if (responseCode === GATEWAY_SUCCESS_CODE) {
+      if (!amountMatches || !transactionMatches) {
+        console.error(`[ZAKA VodaPay] Session ${sessionId}: amount or transaction does not match what was requested. NOT finalised.`);
+        await updateDoc(sessionRef, { status: 'mismatch', updatedAt: nowIso });
+        res.status(200).json({ received: true });
+        return;
+      }
+      if (session.kind === 'topup') {
+        await creditWalletTopup(session.targetId, providerTransactionId);
       } else {
-        // Not a ride payment: check wallet top-ups
-        const topupSnap = await getDocs(
-          query(collection(db, 'wallet_transactions'), where('merchantTransactionId', '==', merchantTransactionId), limit(1))
-        );
-        if (!topupSnap.empty) {
-          const tDoc = topupSnap.docs[0];
-          if (gatewayResultMatches(tDoc.data() as any, reported)) {
-            await creditWalletTopup(tDoc.id, providerId);
-          } else {
-            console.error(`[ZAKA Webhook] Amount mismatch for top-up ${merchantTransactionId}. Wallet NOT credited.`);
-          }
+        const payment = await resolvePaymentRef(session.targetId);
+        // Only the most recent session opened for this ride may settle it
+        if (payment.data && payment.data.gatewaySessionId === sessionId) {
+          await finalizeRidePayment(payment.ref, providerTransactionId);
+        } else {
+          console.error(`[ZAKA VodaPay] Session ${sessionId} is not the active session for ride ${session.targetId}. NOT finalised.`);
+          await updateDoc(sessionRef, { status: 'superseded', updatedAt: nowIso });
+          res.status(200).json({ received: true });
+          return;
+        }
+      }
+      await updateDoc(sessionRef, { status: 'paid', responseCode, providerTransactionId, updatedAt: nowIso });
+    } else {
+      const reason = String(payload.responseMessage || `Payment declined (code ${responseCode || 'unknown'})`).slice(0, 200);
+      await updateDoc(sessionRef, { status: 'failed', responseCode, failureReason: reason, updatedAt: nowIso });
+      if (session.kind === 'topup') {
+        await updateDoc(doc(db, 'wallet_transactions', session.targetId), { status: 'failed', failureReason: reason }).catch(() => {});
+      } else {
+        const payment = await resolvePaymentRef(session.targetId);
+        if (payment.data && payment.data.paymentStatus !== 'paid' && payment.data.gatewaySessionId === sessionId) {
+          await setDoc(payment.ref, { failureReason: reason, updatedAt: nowIso }, { merge: true });
         }
       }
     }
 
-    await markWebhookProcessed(webhookId, payload?.event || payload?.type);
-
-    // Return HTTP 200 ONLY after safe acceptance and processing
     res.status(200).json({ received: true });
   } catch (err: any) {
-    console.error('[ZAKA Webhook] Error processing webhook:', err);
-    res.status(500).json({ error: 'Webhook processing error' });
+    console.error('[ZAKA VodaPay] Error processing notification:', err);
+    res.status(500).json({ error: 'Notification processing error' });
   }
 });
 
-// 6. Peach Shopper Return Callback Endpoint
-// Carries no trust: the app re-verifies the payment with the server after this redirect.
-app.all('/api/payments/peach/return', async (req: Request, res: Response) => {
+// 6. VodaPay shopper return (browser redirect)
+// Carries no trust: the result in its "data" parameter is ignored and the app asks the server for the
+// confirmed status after this redirect.
+app.all('/api/payments/vodapay/return', async (req: Request, res: Response) => {
   const clean = (v: unknown) => (typeof v === 'string' && SAFE_ID_PATTERN.test(v) ? v : '');
   const rideId = clean(req.query.rideId) || clean(req.body?.rideId);
   const walletTx = clean(req.query.walletTx) || clean(req.body?.walletTx);
 
   if (walletTx) {
-    res.redirect(`/?peachReturn=true&walletTopup=${encodeURIComponent(walletTx)}`);
+    res.redirect(`/?paymentReturn=true&walletTopup=${encodeURIComponent(walletTx)}`);
     return;
   }
-  res.redirect(`/?rideId=${encodeURIComponent(rideId)}&peachReturn=true`);
+  res.redirect(`/?rideId=${encodeURIComponent(rideId)}&paymentReturn=true`);
 });
 
 // ============================================================================

@@ -6,9 +6,11 @@
  */
 
 import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { UserRole, VehicleType } from '../../types';
+import { useAuth, NO_ZAKA_ACCOUNT } from '../../context/AuthContext';
+import { UserRole, VehicleType, ACTIVE_VEHICLE_TYPES } from '../../types';
+import { imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
 import { isRiderTarget } from '../../config/appTarget';
+import { validatePhoneNumber, formatPhoneDisplay } from '../../utils/phoneUtils';
 import {
   X,
   User,
@@ -26,6 +28,7 @@ import {
   KeyRound,
   Info,
   ShieldCheck,
+  Camera,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -69,6 +72,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [vehicleColour, setVehicleColour] = useState('Silver');
   const [vehiclePlate, setVehiclePlate] = useState('ZK 89 GP');
   const [vehicleType, setVehicleType] = useState<VehicleType>('economy');
+
+  // Driver's own profile photo (optional at registration, shown to passengers once approved)
+  const [driverPhoto, setDriverPhoto] = useState('');
+  const driverPhotoInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Shown when a Google sign-in found no ZAKA account: the user picks Passenger or Driver first
+  const [googleNotice, setGoogleNotice] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -116,23 +125,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsProfilePending(false);
       setCreatedAuthUser(null);
       setQuickResetSuccess(false);
+      setGoogleNotice('');
     }
   }, [isOpen, initialMode, initialRole]);
 
   if (!isOpen) return null;
 
-  const handleGoogleSignIn = async (selectedRole: UserRole = role) => {
+  // Signing in never creates an account: only the registration screen, where the user has chosen
+  // Passenger or Driver, passes a role. A Google account with no ZAKA profile is sent there to choose.
+  const handleGoogleSignIn = async (selectedRole?: UserRole) => {
     setError('');
+    setGoogleNotice('');
     setLoading(true);
     try {
-      await signInWithGoogle(selectedRole);
+      await signInWithGoogle(mode === 'signup' ? selectedRole : undefined);
       onClose();
     } catch (err: any) {
-      if (err.message !== 'Sign-in cancelled.') {
+      if (err?.code === NO_ZAKA_ACCOUNT) {
+        setMode('signup');
+        setSignupStep('role');
+        setGoogleNotice(err.message);
+      } else if (err.message !== 'Sign-in cancelled.') {
         setError(err.message || 'Google sign-in was unsuccessful.');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDriverPhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const problem = validateImageFile(file);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    try {
+      setDriverPhoto(await imageToAvatarDataUrl(file));
+      setError('');
+    } catch (err: any) {
+      setError(err?.message || 'We could not read this image. Please choose another one.');
     }
   };
 
@@ -223,16 +257,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           name: cleanName,
           phone: cleanPhone,
           role,
+          photoURL: driverPhoto || undefined,
           vehicle: {
             vehicleType,
             make: vehicleMake,
             model: vehicleModel,
             colour: vehicleColour,
             registrationNumber: vehiclePlate,
-            passengerCapacity: vehicleType === 'xl' ? 6 : vehicleType === 'moto' ? 1 : 4,
+            passengerCapacity: vehicleType === 'xl' ? 6 : 4,
             status: 'pending',
           },
         });
+        setDriverPhoto('');
         setName('');
         setEmail('');
         setPhone('');
@@ -419,7 +455,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Google Sign In Option */}
               <button
                 type="button"
-                onClick={() => handleGoogleSignIn('passenger')}
+                onClick={() => handleGoogleSignIn(role)}
                 disabled={loading}
                 className="flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-white py-3 text-xs font-bold text-ink hover:bg-surface-2 active:scale-[0.99] transition-all "
               >
@@ -541,6 +577,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Step 1: "How will you use ZAKA?" Role Selection */}
               {signupStep === 'role' && (
                 <div className="space-y-4">
+                  {googleNotice && (
+                    <div role="status" className="flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900">
+                      <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>{googleNotice}</span>
+                    </div>
+                  )}
                   <div className="text-center space-y-1">
                     <h4 className="text-sm font-bold text-ink">How will you use ZAKA?</h4>
                     <p className="text-xs text-ink-3">
@@ -738,6 +780,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
+                        onBlur={() => {
+                          if (!phone.trim()) return;
+                          const check = validatePhoneNumber(phone);
+                          if (check.valid) {
+                            setPhone(formatPhoneDisplay(check.normalized));
+                            setError('');
+                          } else {
+                            setError(check.error || 'Please enter a valid South African mobile number.');
+                          }
+                        }}
                         placeholder="+27 82 123 4567"
                         className="w-full rounded-input border border-line bg-surface-2 py-2.5 pl-9 pr-3 text-xs text-ink focus:border-primary focus:outline-none"
                         required
@@ -807,6 +859,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Driver Profile Photo */}
+                  {role === 'driver' && (
+                    <div className="flex items-center gap-3 rounded-card border border-line bg-surface-2 p-3.5">
+                      {driverPhoto ? (
+                        <img src={driverPhoto} alt="Your profile" className="h-14 w-14 shrink-0 rounded-full object-cover border border-line" />
+                      ) : (
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white border border-line text-ink-3">
+                          <User className="h-6 w-6" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-[11px] font-bold uppercase text-ink">Profile Photo</span>
+                        <p className="text-[11px] text-ink-3 leading-snug">
+                          A clear photo of your face. Passengers see it when you accept their ride.
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-2">
+                          <button
+                            id="btn-register-driver-photo"
+                            type="button"
+                            onClick={() => driverPhotoInputRef.current?.click()}
+                            className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-bold text-ink hover:bg-surface-2 cursor-pointer"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                            {driverPhoto ? 'Change Photo' : 'Upload Photo'}
+                          </button>
+                          {driverPhoto && (
+                            <button
+                              type="button"
+                              onClick={() => setDriverPhoto('')}
+                              className="rounded-full px-2.5 py-1.5 text-[11px] font-bold text-ink-2 hover:bg-white cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        ref={driverPhotoInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleDriverPhotoSelected}
+                        className="hidden"
+                      />
+                    </div>
+                  )}
+
                   {/* Driver Vehicle Specs */}
                   {role === 'driver' && (
                     <div className="rounded-card border border-line bg-surface-2 p-3.5 space-y-2.5">
@@ -861,8 +959,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <label className="block text-[11px] font-bold text-ink-3 uppercase mb-1">
                           Vehicle Service Class
                         </label>
-                        <div className="grid grid-cols-4 gap-1">
-                          {(['economy', 'comfort', 'xl', 'moto'] as VehicleType[]).map((v) => (
+                        <div className="grid grid-cols-3 gap-1">
+                          {ACTIVE_VEHICLE_TYPES.map((v) => (
                             <button
                               key={v}
                               type="button"

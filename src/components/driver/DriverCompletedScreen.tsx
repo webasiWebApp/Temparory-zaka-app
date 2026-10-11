@@ -78,11 +78,11 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
   const handleVerifyElectronic = async () => {
     setIsVerifying(true);
     try {
-      // Wallet rides are settled by the backend; card rides are confirmed against Peach
+      // Wallet rides are settled by the backend; card rides are confirmed against VodaPay
       if (ride.paymentMethod === 'wallet') {
         await firestoreService.settleRide(ride.id);
       } else {
-        await paymentService.verifyPeachPayment(ride.id);
+        await paymentService.verifyCardPayment(ride.id);
       }
     } catch (e) {
       console.warn('Verify payment error:', e);
@@ -219,12 +219,12 @@ export const DriverCompletedScreen: React.FC<DriverCompletedScreenProps> = ({
               <CreditCard className={`h-5 w-5 ${isPaid ? 'text-success' : 'text-blue-600'} shrink-0`} />
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider">
-                  {isPaid ? 'Peach Payment Confirmed' : 'Electronic Payment Processing'}
+                  {isPaid ? 'VodaPay Payment Confirmed' : 'Electronic Payment Processing'}
                 </h4>
                 <p className="text-xs mt-0.5">
                   {isPaid
-                    ? `Payment of R${finalFare.toFixed(2)} confirmed via Peach Payments. Net earnings (+R${netEarnings.toFixed(2)}) finalized.`
-                    : `Passenger is paying via Peach Payments. Earnings finalize automatically upon gateway confirmation.`}
+                    ? `Payment of R${finalFare.toFixed(2)} confirmed via VodaPay. Net earnings (+R${netEarnings.toFixed(2)}) finalized.`
+                    : `Passenger is paying via VodaPay. Earnings finalize automatically upon gateway confirmation.`}
                 </p>
               </div>
             </div>

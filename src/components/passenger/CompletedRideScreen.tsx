@@ -63,7 +63,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
   // Payment flow state
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
-  const [isVerifyingPeach, setIsVerifyingPeach] = useState<boolean>(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState<boolean>(false);
 
   const finalFare = ride.finalFare || ride.estimatedFare || 35.0;
   const formattedRequestedTime = ride.requestedAt
@@ -86,20 +86,20 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
     return () => unsub();
   }, [ride.id]);
 
-  // Check if passenger returned from Peach Checkout
+  // Check if passenger returned from VodaPay Checkout
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('peachReturn') === 'true' && urlParams.get('rideId') === ride.id) {
-      setIsVerifyingPeach(true);
+    if (urlParams.get('paymentReturn') === 'true' && urlParams.get('rideId') === ride.id) {
+      setIsVerifyingPayment(true);
       paymentService
-        .verifyPeachPayment(ride.id)
+        .verifyCardPayment(ride.id)
         .then((res) => {
           if (res.success) {
-            setPaymentNotice('Peach payment confirmed successfully!');
+            setPaymentNotice('VodaPay payment confirmed successfully!');
           }
         })
         .finally(() => {
-          setIsVerifyingPeach(false);
+          setIsVerifyingPayment(false);
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
         });
@@ -159,14 +159,14 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
   };
 
   const handleVerifyStatus = async () => {
-    setIsVerifyingPeach(true);
+    setIsVerifyingPayment(true);
     try {
-      const res = await paymentService.verifyPeachPayment(ride.id);
+      const res = await paymentService.verifyCardPayment(ride.id);
       setPaymentNotice(res.message);
     } catch (e: any) {
       setPaymentNotice('Verification check error.');
     } finally {
-      setIsVerifyingPeach(false);
+      setIsVerifyingPayment(false);
     }
   };
 
@@ -414,7 +414,7 @@ export const CompletedRideScreen: React.FC<CompletedRideScreenProps> = ({
                     {isPaid ? 'Payment Settled Successfully' : 'Digital Payment Pending'}
                   </span>
                   <span className="text-[11px] text-ink-2">
-                    {isPaid ? 'Peach Payments transaction confirmed' : '3D-Secure card authorization'}
+                    {isPaid ? 'VodaPay transaction confirmed' : '3D-Secure card authorization'}
                   </span>
                 </div>
               </div>

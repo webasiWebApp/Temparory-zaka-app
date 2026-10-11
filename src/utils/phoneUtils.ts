@@ -17,6 +17,8 @@
  * - +27821234567      -> +27821234567
  * - 27821234567       -> +27821234567
  * - 0027 82 123 4567  -> +27821234567
+ * - +27 082 123 4567  -> +27821234567
+ * - 82 123 4567       -> +27821234567
  */
 export function normalizePhoneNumber(raw: string): string {
   if (!raw) return '';
@@ -47,7 +49,17 @@ export function normalizePhoneNumber(raw: string): string {
     return cleaned;
   }
 
-  // 6. Generic E.164 international format fallback: ensure single leading '+'
+  // 6. Country code typed together with the trunk '0' (e.g. +27 082 123 4567 or 27 082 123 4567)
+  if (/^\+?270[1-9]\d{8}$/.test(cleaned)) {
+    return '+27' + cleaned.replace(/^\+?270/, '');
+  }
+
+  // 7. Bare 9-digit national number with the leading '0' left off (e.g. 82 123 4567)
+  if (/^[1-9]\d{8}$/.test(cleaned)) {
+    return '+27' + cleaned;
+  }
+
+  // 8. Generic E.164 international format fallback: ensure single leading '+'
   if (!cleaned.startsWith('+') && /^\d{9,15}$/.test(cleaned)) {
     return '+' + cleaned;
   }

@@ -31,7 +31,7 @@ export interface PaymentProviderResponse {
   code?: string;
   requiresRedirect?: boolean;
   redirectUrl?: string;
-  peachCheckoutId?: string;
+  gatewaySessionId?: string;
   amount?: number;
 }
 
@@ -45,7 +45,7 @@ export const paymentService = {
   },
 
   /**
-   * Retrieves public Peach Payments gateway configuration from secure server endpoint
+   * Retrieves public VodaPay gateway configuration from secure server endpoint
    */
   async getGatewayConfig(): Promise<PaymentGatewayConfig> {
     try {
@@ -54,7 +54,7 @@ export const paymentService = {
       return data;
     } catch (e) {
       return {
-        provider: 'peach',
+        provider: 'vodapay',
         env: 'sandbox',
         isConfigured: false,
         currency: 'ZAR',
@@ -95,13 +95,13 @@ export const paymentService = {
 
       case 'card':
         return {
-          label: 'Card (Peach Payments)',
-          description: 'Pay securely via Peach Payments Hosted Checkout (Visa, Mastercard, 3D Secure).',
+          label: 'Card (VodaPay)',
+          description: 'Pay securely via VodaPay hosted checkout (Visa, Mastercard, 3D Secure).',
           isConfigured,
           badgeText: isConfigured
             ? env === 'production'
-              ? 'Peach Secure'
-              : 'Peach Sandbox'
+              ? 'VodaPay Secure'
+              : 'VodaPay Test'
             : 'Not available yet',
           badgeColor: isConfigured
             ? 'bg-emerald-100 text-emerald-800'
@@ -111,9 +111,9 @@ export const paymentService = {
       case 'digital':
         return {
           label: 'Electronic / Digital',
-          description: 'Instant EFT, 1Voucher, Masterpass & digital payment channels via Peach Payments.',
+          description: 'Instant EFT, 1Voucher, Masterpass & digital payment channels via VodaPay.',
           isConfigured,
-          badgeText: isConfigured ? 'Peach Gateway' : 'Not available yet',
+          badgeText: isConfigured ? 'VodaPay Gateway' : 'Not available yet',
           badgeColor: isConfigured
             ? 'bg-blue-100 text-blue-800'
             : 'bg-amber-100 text-amber-800',
@@ -131,7 +131,7 @@ export const paymentService = {
   /**
    * Initiates payment for a completed ride.
    * For Cash: creates/updates payment record in Firestore with pending status for cash collection.
-   * For Card/Digital: calls secure ZAKA server to initiate Peach Payments Hosted Checkout.
+   * For Card/Digital: calls secure ZAKA server to initiate VodaPay hosted checkout.
    */
   async processPaymentInitiation(
     ride: RideDocument,
@@ -174,21 +174,21 @@ export const paymentService = {
       };
     }
 
-    // Electronic Payment via Peach Payments
+    // Electronic Payment via VodaPay
     try {
       // The amount is decided by the server from the ride itself - it is not sent from the app
-      const response = await apiJson<any>('/api/payments/peach/initiate', {
+      const response = await apiJson<any>('/api/payments/card/initiate', {
         method: 'POST',
         json: { rideId: ride.id, paymentMethod: method },
       });
       const data = response.data || {};
 
-      if (data.code === 'PEACH_CREDENTIALS_REQUIRED') {
+      if (data.code === 'GATEWAY_NOT_CONFIGURED') {
         return {
           success: false,
-          code: 'PEACH_CREDENTIALS_REQUIRED',
+          code: 'GATEWAY_NOT_CONFIGURED',
           paymentStatus: 'pending',
-          provider: 'peach',
+          provider: 'vodapay',
           merchantTransactionId: data.merchantTransactionId,
           amount: data.amount,
           message: data.message || 'Card payments are not available yet. Please pay your driver in cash.',
@@ -199,11 +199,11 @@ export const paymentService = {
         return {
           success: false,
           paymentStatus: 'pending',
-          provider: 'peach',
+          provider: 'vodapay',
           message:
             response.status === 401
               ? 'Your session has expired. Please sign in again to pay.'
-              : data.error || data.message || 'Unable to initiate Peach Payments checkout session.',
+              : data.error || data.message || 'Unable to initiate VodaPay checkout session.',
         };
       }
 
@@ -211,7 +211,7 @@ export const paymentService = {
         return {
           success: true,
           paymentStatus: 'paid',
-          provider: 'peach',
+          provider: 'vodapay',
           amount: data.amount,
           message: data.message || 'Payment has already been confirmed.',
         };
@@ -222,12 +222,12 @@ export const paymentService = {
           success: true,
           requiresRedirect: true,
           redirectUrl: data.redirectUrl,
-          peachCheckoutId: data.peachCheckoutId,
+          gatewaySessionId: data.gatewaySessionId,
           merchantTransactionId: data.merchantTransactionId,
           paymentStatus: 'pending',
-          provider: 'peach',
+          provider: 'vodapay',
           amount: data.amount,
-          message: 'Redirecting to Peach Payments secure checkout...',
+          message: 'Redirecting to VodaPay secure checkout...',
         };
       }
 
@@ -235,29 +235,29 @@ export const paymentService = {
         success: Boolean(data.success),
         paymentStatus: data.paymentStatus || 'pending',
         merchantTransactionId: data.merchantTransactionId,
-        provider: 'peach',
+        provider: 'vodapay',
         message: data.message || 'Payment session active.',
       };
     } catch (err: any) {
-      console.warn('[PaymentService] Peach initiate request failed:', err);
+      console.warn('[PaymentService] VodaPay initiate request failed:', err);
       return {
         success: false,
         paymentStatus: 'pending',
-        provider: 'peach',
+        provider: 'vodapay',
         message: 'Could not connect to payment service. Please try again or settle via Cash.',
       };
     }
   },
 
   /**
-   * Verifies Peach Payments transaction status through server-side validation
+   * Verifies VodaPay transaction status through server-side validation
    */
-  async verifyPeachPayment(
+  async verifyCardPayment(
     rideId: string
   ): Promise<{ success: boolean; paymentStatus: PaymentStatus; message: string }> {
     try {
       // The server checks the checkout it created for this ride; nothing else is accepted from the app
-      const { data } = await apiJson<any>('/api/payments/peach/verify', {
+      const { data } = await apiJson<any>('/api/payments/card/verify', {
         method: 'POST',
         json: { rideId },
       });
@@ -267,7 +267,7 @@ export const paymentService = {
         message: data.message || data.error || (data.success ? 'Payment verified successfully.' : 'Payment pending verification.'),
       };
     } catch (err: any) {
-      console.warn('[PaymentService] Peach verify request failed:', err);
+      console.warn('[PaymentService] VodaPay verify request failed:', err);
       return {
         success: false,
         paymentStatus: 'pending',
@@ -277,8 +277,8 @@ export const paymentService = {
   },
 
   /**
-   * Starts a wallet top-up. On success the caller redirects the browser to Peach secure checkout;
-   * the wallet is credited by the backend only once Peach confirms the payment.
+   * Starts a wallet top-up. On success the caller redirects the browser to VodaPay secure checkout;
+   * the wallet is credited by the backend only once VodaPay confirms the payment.
    */
   async initiateWalletTopup(amount: number): Promise<{ success: boolean; redirectUrl?: string; transactionId?: string; message: string }> {
     try {

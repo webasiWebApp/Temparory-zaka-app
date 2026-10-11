@@ -51,18 +51,18 @@ export const IncomingRideCard: React.FC<IncomingRideCardProps> = ({
   useEffect(() => {
     setSecondsRemaining(15);
     const interval = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          onDecline(request.id);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => clearInterval(interval);
   }, [request.id]);
+
+  // Auto-decline when the countdown runs out (kept out of the state updater, which must stay pure)
+  useEffect(() => {
+    if (secondsRemaining === 0) {
+      onDecline(request.id);
+    }
+  }, [secondsRemaining, request.id]);
 
   const timerPercentage = (secondsRemaining / 15) * 100;
 

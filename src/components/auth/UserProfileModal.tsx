@@ -27,23 +27,32 @@ import {
   Camera,
   AlertTriangle,
 } from 'lucide-react';
-import { VehicleType } from '../../types';
+import { VehicleType, ACTIVE_VEHICLE_TYPES } from '../../types';
 import { isRiderTarget } from '../../config/appTarget';
 import { apiFetch } from '../../services/apiClient';
 import { validatePhoneNumber as validateZakaPhone, formatPhoneDisplay, normalizePhoneNumber } from '../../utils/phoneUtils';
+import { ownPhotoURL, imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
+import { SavedPlacesEditor } from '../passenger/SavedPlacesEditor';
+import { PhoneOtpVerifier } from './PhoneOtpVerifier';
 
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-];
+/** Firestore errors arrive as raw JSON or SDK text: never show those to the user */
+function readableSaveError(err: any): string {
+  const msg = String(err?.message || '');
+  if (!msg || msg.startsWith('{') || /permission|insufficient|firestore/i.test(msg)) {
+    return 'We could not save your changes. Please check your connection and try again.';
+  }
+  return msg;
+}
+
+/** Shows only the last four characters of an ID number */
+function maskIdNumber(idNumber: string): string {
+  return idNumber.length > 4 ? `${'•'.repeat(idNumber.length - 4)}${idNumber.slice(-4)}` : idNumber;
+}
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
   const {
@@ -54,6 +63,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     updateUserProfileData,
     updatePassengerProfileData,
     updateDriverProfileData,
+    confirmVerifiedPhone,
     resetPassword,
     deleteAccount,
     isSigningOut,
@@ -73,7 +83,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [name, setName] = useState(userProfile?.name || '');
   const [phone, setPhone] = useState(userProfile?.phone ? formatPhoneDisplay(normalizePhoneNumber(userProfile.phone)) : '');
   const [email] = useState(userProfile?.email || '');
-  const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || AVATAR_PRESETS[0]);
+  const [photoURL, setPhotoURL] = useState(ownPhotoURL(userProfile?.photoURL));
+  const photoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [changingPhone, setChangingPhone] = useState(false);
+
+  const isPassenger = activeRole === 'passenger';
+  const isDriver = activeRole === 'driver';
+  // Identity details are fixed once a passenger has submitted them for verification
+  const identityLocked =
+    isPassenger && ['pending', 'approved'].includes(passengerProfile?.verificationStatus || '');
 
   // Driver Vehicle form states
   const [vehicleMake, setVehicleMake] = useState(driverProfile?.vehicle?.make || '');
@@ -81,11 +99,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [vehicleColour, setVehicleColour] = useState(driverProfile?.vehicle?.colour || '');
   const [vehiclePlate, setVehiclePlate] = useState(driverProfile?.vehicle?.registrationNumber || '');
   const [vehicleType, setVehicleType] = useState<VehicleType>(driverProfile?.vehicle?.vehicleType || 'economy');
-
-  // Passenger Saved Places
-  const [savedPlaces, setSavedPlaces] = useState(passengerProfile?.savedPlaces || []);
-  const [newPlaceLabel, setNewPlaceLabel] = useState('');
-  const [newPlaceAddress, setNewPlaceAddress] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -99,8 +112,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     if (!isOpen) return;
     setName(userProfile?.name || '');
     setPhone(userProfile?.phone ? formatPhoneDisplay(normalizePhoneNumber(userProfile.phone)) : '');
-    setPhotoURL(userProfile?.photoURL || AVATAR_PRESETS[0]);
-    setSavedPlaces(passengerProfile?.savedPlaces || []);
+    setPhotoURL(ownPhotoURL(userProfile?.photoURL));
+    setChangingPhone(false);
     setError('');
     setExportNotice(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,21 +186,42 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
   if (!isOpen) return null;
 
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError('');
+    const problem = validateImageFile(file);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    try {
+      setPhotoURL(await imageToAvatarDataUrl(file));
+    } catch (err: any) {
+      setError(err?.message || 'We could not read this image. Please choose another one.');
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Phone validation
-    const phoneCheck = validateZakaPhone(phone);
-    if (!phoneCheck.valid) {
-      setError(phoneCheck.error || 'Please enter a valid South African mobile number (e.g. 082 123 4567).');
-      return;
+    // A passenger's number only changes through SMS verification (see "Change number")
+    const phoneEditable = !isPassenger;
+    let trimmedPhone = '';
+    if (phoneEditable && (phone.trim() || isDriver)) {
+      const phoneCheck = validateZakaPhone(phone);
+      if (!phoneCheck.valid) {
+        setError(phoneCheck.error || 'Please enter a valid South African mobile number (e.g. 082 123 4567).');
+        return;
+      }
+      // Stored once, in canonical form (+27821234567), on every profile document
+      trimmedPhone = phoneCheck.normalized;
     }
-    // Stored once, in canonical form (+27821234567), on every profile document
-    const trimmedPhone = phoneCheck.normalized;
 
     // Name validation
-    const trimmedName = name.trim();
+    const trimmedName = identityLocked ? userProfile?.name || '' : name.trim();
     if (trimmedName.length < 2) {
       setError('Please enter a valid name (at least 2 characters).');
       return;
@@ -195,18 +229,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
     setSaving(true);
     try {
+      // Only what this form is allowed to change is sent
       await updateUserProfileData({
-        name: trimmedName,
-        phone: trimmedPhone,
+        ...(identityLocked ? {} : { name: trimmedName }),
+        ...(trimmedPhone ? { phone: trimmedPhone } : {}),
         photoURL,
       });
 
-      if (activeRole === 'passenger') {
-        await updatePassengerProfileData({
-          name: trimmedName,
-          phone: trimmedPhone,
-          savedPlaces,
-        });
+      if (isPassenger) {
+        if (!identityLocked) {
+          await updatePassengerProfileData({ name: trimmedName });
+        }
       } else if (activeRole === 'driver') {
         await updateDriverProfileData({
           name: trimmedName,
@@ -219,18 +252,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             colour: vehicleColour,
             registrationNumber: vehiclePlate,
             vehicleType,
-            passengerCapacity: vehicleType === 'xl' ? 6 : vehicleType === 'moto' ? 1 : 4,
+            passengerCapacity: vehicleType === 'xl' ? 6 : 4,
             // Vehicle approval is decided by ZAKA Admin, never by the driver's own profile form
             status: driverProfile?.vehicle?.status || 'pending',
           },
         });
       }
 
-      setPhone(formatPhoneDisplay(trimmedPhone));
+      if (trimmedPhone) setPhone(formatPhoneDisplay(trimmedPhone));
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || 'Failed to save changes');
+      console.error('Profile update failed:', err);
+      setError(readableSaveError(err));
     } finally {
       setSaving(false);
     }
@@ -245,24 +279,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     } catch (err: any) {
       setError(err.message || 'Failed to send password reset');
     }
-  };
-
-  const handleAddPlace = () => {
-    if (!newPlaceLabel || !newPlaceAddress) return;
-    const newPlace = {
-      id: `sp-${Date.now()}`,
-      label: newPlaceLabel,
-      address: newPlaceAddress,
-      location: { latitude: -26.1458, longitude: 28.0416 },
-      icon: 'favorite' as const,
-    };
-    setSavedPlaces([...savedPlaces, newPlace]);
-    setNewPlaceLabel('');
-    setNewPlaceAddress('');
-  };
-
-  const handleDeletePlace = (id: string) => {
-    setSavedPlaces(savedPlaces.filter((p) => p.id !== id));
   };
 
   return (
@@ -281,14 +297,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
         <div className="flex items-center justify-between border-b border-line p-5">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <img
-                src={photoURL || AVATAR_PRESETS[0]}
-                alt={name || 'User'}
-                className="h-11 w-11 rounded-card object-cover border border-line "
-              />
-              <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-ink">
-                ✓
-              </span>
+              {photoURL ? (
+                <img
+                  src={photoURL}
+                  alt={name || 'User'}
+                  className="h-11 w-11 rounded-card object-cover border border-line "
+                />
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-card bg-ink text-base font-bold text-white">
+                  {(userProfile?.name || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
             <div>
               <h3 id="user-profile-modal-title" className="text-base font-bold text-ink">{userProfile?.name || 'Account Settings'}</h3>
@@ -382,50 +401,127 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           {/* TAB 1: PROFILE INFO */}
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-4">
-              {/* Avatar Selector */}
-              <div>
-                <label className="block text-xs font-bold text-ink mb-2">
-                  Choose Profile Photo
-                </label>
-                <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-                  {AVATAR_PRESETS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setPhotoURL(preset)}
-                      className={`relative h-12 w-12 shrink-0 rounded-full overflow-hidden border-2 transition-all ${
-                        photoURL === preset ? 'border-primary scale-105 shadow-card' : 'border-line opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={preset} alt="avatar option" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
+              {/* Drivers upload their own profile photo (passengers see it when a ride is accepted) */}
+              {isDriver && (
+                <div>
+                  <span className="block text-xs font-bold text-ink mb-2">Profile Photo</span>
+                  <div className="flex items-center gap-3">
+                    {photoURL ? (
+                      <img src={photoURL} alt="Your profile" className="h-14 w-14 rounded-full object-cover border border-line" />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-2 border border-line text-ink-3">
+                        <User className="h-6 w-6" />
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        id="btn-upload-profile-photo"
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-xs font-bold text-ink hover:bg-surface-2 cursor-pointer"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        {photoURL ? 'Change Photo' : 'Upload Photo'}
+                      </button>
+                      {photoURL && (
+                        <button
+                          type="button"
+                          onClick={() => setPhotoURL('')}
+                          className="rounded-full px-3 py-2 text-xs font-bold text-ink-2 hover:bg-surface-2 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoSelected}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Full Name</label>
+                <label htmlFor="profile-name" className="block text-xs font-bold text-ink mb-1">Name and Surname</label>
                 <input
+                  id="profile-name"
                   type="text"
-                  value={name}
+                  value={identityLocked ? userProfile?.name || '' : name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-input border border-line bg-surface-2 p-3 text-xs text-ink focus:border-primary focus:outline-none"
+                  disabled={identityLocked}
+                  className={`w-full rounded-input border border-line p-3 text-xs focus:border-primary focus:outline-none ${
+                    identityLocked ? 'bg-[#EEEEEE] text-ink-3 cursor-not-allowed' : 'bg-surface-2 text-ink'
+                  }`}
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-ink mb-1">
-                  Phone Number (South Africa +27)
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-input border border-line bg-surface-2 p-3 text-xs text-ink focus:border-primary focus:outline-none"
-                  required
-                />
-              </div>
+              {isPassenger ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="block text-xs font-bold text-ink">Mobile Number</span>
+                    {passengerProfile?.phoneVerified && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-success">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                  {changingPhone ? (
+                    <div className="rounded-card border border-line p-3">
+                      <PhoneOtpVerifier
+                        onCancel={() => setChangingPhone(false)}
+                        onVerified={async (verified) => {
+                          await confirmVerifiedPhone(verified);
+                          setPhone(formatPhoneDisplay(verified));
+                          setChangingPhone(false);
+                          setSaveSuccess(true);
+                          setTimeout(() => setSaveSuccess(false), 3000);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="tel"
+                        aria-label="Mobile number"
+                        value={phone || 'Not set'}
+                        disabled
+                        className="w-full rounded-input border border-line bg-[#EEEEEE] p-3 text-xs text-ink-3 cursor-not-allowed"
+                      />
+                      <button
+                        id="btn-change-phone"
+                        type="button"
+                        onClick={() => {
+                          setError('');
+                          setChangingPhone(true);
+                        }}
+                        className="shrink-0 rounded-full border border-line bg-white px-3.5 py-2.5 text-xs font-bold text-ink hover:bg-surface-2 cursor-pointer"
+                      >
+                        {phone ? 'Change' : 'Add'}
+                      </button>
+                    </div>
+                  )}
+                  <p className="mt-1 text-[11px] text-ink-3">A new number is confirmed with a code sent by SMS.</p>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="profile-phone" className="block text-xs font-bold text-ink mb-1">
+                    Phone Number (South Africa +27)
+                  </label>
+                  <input
+                    id="profile-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full rounded-input border border-line bg-surface-2 p-3 text-xs text-ink focus:border-primary focus:outline-none"
+                    required={isDriver}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">Email Address</label>
@@ -437,87 +533,65 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-xs font-bold text-ink shadow-card hover:bg-primary-hover active:bg-primary-pressed active:scale-[0.99] transition-all"
-              >
-                <Save className="h-4 w-4" />
-                <span>{saving ? 'Saving...' : 'Save Profile Details'}</span>
-              </button>
+              {/* Passenger identity details: shown for reference, never editable after registration */}
+              {isPassenger && passengerProfile?.dateOfBirth && (
+                <div className="rounded-card border border-line bg-surface-2 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-ink">
+                      <Shield className="h-3.5 w-3.5 text-primary-text" />
+                      Identity Details
+                    </span>
+                    <span className="rounded-full bg-white border border-line px-2 py-0.5 text-[11px] font-bold uppercase text-ink-2">
+                      {passengerProfile.verificationStatus === 'approved'
+                        ? 'Verified'
+                        : passengerProfile.verificationStatus === 'pending'
+                        ? 'Under review'
+                        : passengerProfile.verificationStatus === 'rejected'
+                        ? 'Not approved'
+                        : 'Not submitted'}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                    <div>
+                      <dt className="text-[11px] text-ink-3">Date of Birth</dt>
+                      <dd className="font-bold text-ink">{passengerProfile.dateOfBirth.replace(/-/g, '/')}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] text-ink-3">Gender</dt>
+                      <dd className="font-bold text-ink capitalize">{passengerProfile.gender || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] text-ink-3">Nationality</dt>
+                      <dd className="font-bold text-ink">{passengerProfile.nationality || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[11px] text-ink-3">ID Number</dt>
+                      <dd className="font-bold text-ink">{passengerProfile.idNumber ? maskIdNumber(passengerProfile.idNumber) : '—'}</dd>
+                    </div>
+                  </dl>
+                  <p className="text-[11px] text-ink-3">
+                    Your name, date of birth, gender, nationality and ID number cannot be changed after registration.
+                    Contact ZAKA support if any of them is wrong.
+                  </p>
+                </div>
+              )}
+
+              {/* Nothing on this form is editable for a passenger whose identity is locked */}
+              {!identityLocked && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-xs font-bold text-ink shadow-card hover:bg-primary-hover active:bg-primary-pressed active:scale-[0.99] transition-all"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>{saving ? 'Saving...' : 'Save Profile Details'}</span>
+                </button>
+              )}
             </form>
           )}
 
-          {/* TAB 2: PASSENGER SAVED PLACES */}
-          {activeTab === 'places' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-ink">Saved Favorite Locations</span>
-                {savedPlaces.map((place) => (
-                  <div
-                    key={place.id}
-                    className="flex items-center justify-between rounded-card border border-line bg-surface-2 p-3"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-200 text-ink">
-                        <MapPin className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-ink">{place.label}</p>
-                        <p className="text-[11px] text-ink-3 truncate max-w-[240px]">
-                          {place.address}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePlace(place.id)}
-                      className="rounded-full p-1.5 text-neutral-400 hover:bg-red-50 hover:text-danger"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Add New Place */}
-              <div className="rounded-card border border-line p-3 space-y-2 bg-white">
-                <span className="text-xs font-bold text-ink">Add New Place</span>
-                <input
-                  type="text"
-                  placeholder="Label (e.g. Gym, University, Parent's Home)"
-                  value={newPlaceLabel}
-                  onChange={(e) => setNewPlaceLabel(e.target.value)}
-                  className="w-full rounded-input border border-line bg-surface-2 p-2.5 text-xs text-ink"
-                />
-                <input
-                  type="text"
-                  placeholder="Address (e.g. 100 Main St, Johannesburg)"
-                  value={newPlaceAddress}
-                  onChange={(e) => setNewPlaceAddress(e.target.value)}
-                  className="w-full rounded-input border border-line bg-surface-2 p-2.5 text-xs text-ink"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddPlace}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full bg-ink py-2.5 text-xs font-bold text-white hover:bg-ink"
-                >
-                  <Plus className="h-3.5 w-3.5 text-primary-text" />
-                  <span>Add to Saved Places</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-xs font-bold text-ink"
-              >
-                <Save className="h-4 w-4" />
-                <span>Save Places</span>
-              </button>
-            </div>
-          )}
+          {/* TAB 2: PASSENGER SAVED PLACES (each change is saved to the account immediately) */}
+          {activeTab === 'places' && <SavedPlacesEditor />}
 
           {/* TAB 3: DRIVER VEHICLE DETAILS */}
           {activeTab === 'vehicle' && (
@@ -577,7 +651,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   Vehicle Category Class
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['economy', 'comfort', 'xl', 'moto'] as VehicleType[]).map((vClass) => (
+                  {ACTIVE_VEHICLE_TYPES.map((vClass) => (
                     <button
                       key={vClass}
                       type="button"

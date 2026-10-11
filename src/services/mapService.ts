@@ -13,6 +13,7 @@ import { routingService, RouteGeometry } from './routingService';
 export const TELEMETRY_THRESHOLDS = {
   MIN_DISTANCE_METERS: 15,     // 15 meters
   MIN_TIME_INTERVAL_MS: 10000, // 10 seconds
+  MIN_WRITE_GAP_MS: 4000,      // never persist more often than every 4 seconds, however fast the driver moves
   STALE_LOCATION_MS: 20000,    // 20 seconds without GPS update = STALE
 };
 
@@ -47,7 +48,11 @@ export const mapService = {
     const distMeters = this.distanceMeters(lastPersistedCoords, newCoords);
     const timeElapsedMs = nowMs - lastPersistedTimestampMs;
 
-    if (distMeters >= TELEMETRY_THRESHOLDS.MIN_DISTANCE_METERS) {
+    if (timeElapsedMs < TELEMETRY_THRESHOLDS.MIN_WRITE_GAP_MS) {
+      return { shouldPersist: false, reason: 'none', distanceMeters: Math.round(distMeters) };
+    }
+
+    if (distMeters >=TELEMETRY_THRESHOLDS.MIN_DISTANCE_METERS) {
       return { shouldPersist: true, reason: 'distance', distanceMeters: Math.round(distMeters) };
     }
 

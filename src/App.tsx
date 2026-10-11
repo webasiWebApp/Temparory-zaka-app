@@ -15,12 +15,14 @@ import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
 import { VerifyEmailScreen } from './components/auth/VerifyEmailScreen';
 import { RideHistoryModal } from './components/passenger/RideHistoryModal';
+import { PassengerVerificationScreen } from './components/passenger/PassengerVerificationScreen';
+import { onGoHome } from './utils/appEvents';
 import { DemoTestBanner } from './components/demo/DemoTestBanner';
 import { UserRole } from './types';
 import { isRiderTarget } from './config/appTarget';
 
 const AppContent: React.FC = () => {
-  const { currentUser, userProfile, activeRole, roles, isAdmin, isDemoTestMode, loading, isEmailVerified } = useAuth();
+  const { currentUser, userProfile, passengerProfile, activeRole, roles, isAdmin, isDemoTestMode, loading, isEmailVerified } = useAuth();
   const [authConfig, setAuthConfig] = useState<{
     isOpen: boolean;
     mode?: 'signin' | 'signup' | 'forgot';
@@ -78,6 +80,30 @@ const AppContent: React.FC = () => {
     setIsHistoryOpen(false);
   };
 
+  // ZAKA logo pressed: close every dialog so the Home view is what the user sees
+  React.useEffect(
+    () =>
+      onGoHome(() => {
+        setIsProfileOpen(false);
+        setIsHistoryOpen(false);
+      }),
+    []
+  );
+
+  const showAdminView = !isRiderTarget && activeRole === 'admin' && isAdmin;
+  const showDriverView =
+    !isRiderTarget && (activeRole === 'driver' || userProfile?.role === 'driver' || userProfile?.activeRole === 'driver');
+  // Passengers use the service only once ZAKA Admin has approved their identity (ID document + live photo).
+  // Admin and isolated demo sessions are exempt.
+  const needsPassengerVerification =
+    isAuthenticated &&
+    !showAdminView &&
+    !showDriverView &&
+    !isAdmin &&
+    !isDemoTestMode &&
+    !userProfile?.isDemo &&
+    passengerProfile?.verificationStatus !== 'approved';
+
   // The dialogs below stay mounted while the session loads, so a failed sign-in keeps its error message
   // instead of the auth dialog re-opening blank.
   if (loading) {
@@ -129,10 +155,12 @@ const AppContent: React.FC = () => {
       ) : (
         /* Main Role-Based Views: Strictly verified authorization */
         <main className="flex-1 flex flex-col w-full min-h-0 h-full relative overflow-hidden">
-          {!isRiderTarget && activeRole === 'admin' && isAdmin ? (
+          {showAdminView ? (
             <AdminDashboard />
-          ) : !isRiderTarget && (activeRole === 'driver' || userProfile?.role === 'driver' || userProfile?.activeRole === 'driver') ? (
+          ) : showDriverView ? (
             <DriverApp />
+          ) : needsPassengerVerification ? (
+            <PassengerVerificationScreen />
           ) : (
             <PassengerApp
               onOpenAuth={handleOpenAuth}

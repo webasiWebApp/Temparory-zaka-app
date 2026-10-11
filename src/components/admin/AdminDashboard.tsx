@@ -10,6 +10,10 @@ import { useAuth } from '../../context/AuthContext';
 import { firestoreService } from '../../firebase/firestoreService';
 import {
   UserProfile,
+  PassengerProfile,
+  PassengerVerificationImage,
+  PassengerVerificationImageKind,
+  ACTIVE_VEHICLE_TYPES,
   DriverProfile,
   RideDocument,
   PaymentRecord,
@@ -25,6 +29,8 @@ import { resolveDocumentUrl, ResolvedDocument } from '../../utils/documentUtils'
 import { fareService, ZAKA_DEFAULT_LAUNCH_PRICING } from '../../services/fareService';
 import { paymentService, PaymentGatewayConfig } from '../../services/paymentService';
 import { InteractiveMap } from '../common/InteractiveMap';
+import { onGoHome } from '../../utils/appEvents';
+import { formatPhoneDisplay, normalizePhoneNumber } from '../../utils/phoneUtils';
 import {
   Users,
   Car,
@@ -67,6 +73,18 @@ export const AdminDashboard: React.FC = () => {
   >('dashboard');
 
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [passengers, setPassengers] = useState<PassengerProfile[]>([]);
+  // Passenger identity review (ID document + live photo)
+  const [reviewPassenger, setReviewPassenger] = useState<PassengerProfile | null>(null);
+  const [reviewImages, setReviewImages] = useState<Partial<Record<PassengerVerificationImageKind, PassengerVerificationImage>>>({});
+  const [reviewImagesLoading, setReviewImagesLoading] = useState(false);
+  const [reviewRejectReason, setReviewRejectReason] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewZoomUrl, setReviewZoomUrl] = useState<string | null>(null);
+
+  // ZAKA logo pressed: back to the dashboard overview
+  useEffect(() => onGoHome(() => setActiveTab('dashboard')), []);
   const [drivers, setDrivers] = useState<DriverProfile[]>([]);
   const [rides, setRides] = useState<RideDocument[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -190,8 +208,9 @@ export const AdminDashboard: React.FC = () => {
     setLoading(true);
     try {
       const isDemo = Boolean(userProfile?.isDemo);
-      const [u, d, r, p, pr, rat, gw, logs] = await Promise.all([
+      const [u, pax, d, r, p, pr, rat, gw, logs] = await Promise.all([
         firestoreService.getAllUsers(isDemo),
+        isDemo ? Promise.resolve([]) : firestoreService.getAllPassengers().catch(() => []),
         firestoreService.getAllDrivers(isDemo),
         firestoreService.getAllRides(isDemo),
         firestoreService.getAllPayments(isDemo),
@@ -201,6 +220,7 @@ export const AdminDashboard: React.FC = () => {
         firestoreService.getAuditLogs(50).catch(() => []),
       ]);
       setUsers(u);
+      setPassengers(pax);
       setDrivers(d);
       setRides(r);
       setPayments(p);
@@ -241,6 +261,49 @@ export const AdminDashboard: React.FC = () => {
   // Platform GMV & Revenue (15% take rate)
   const totalGmv = payments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const platformRevenue = totalGmv * 0.15;
+
+  const passengerById = new Map(passengers.map((p) => [p.userId, p]));
+  const pendingPassengerCount = passengers.filter((p) => p.verificationStatus === 'pending').length;
+
+  const openPassengerReview = async (passenger: PassengerProfile) => {
+    setReviewPassenger(passenger);
+    setReviewImages({});
+    setReviewRejectReason('');
+    setReviewError('');
+    setReviewImagesLoading(true);
+    try {
+      setReviewImages(await firestoreService.getPassengerVerificationImages(passenger.userId));
+    } catch (err) {
+      console.warn('Could not load passenger verification photos:', err);
+      setReviewError('The verification photos could not be loaded. Please try again.');
+    } finally {
+      setReviewImagesLoading(false);
+    }
+  };
+
+  const handleReviewPassenger = async (status: 'approved' | 'rejected') => {
+    if (!reviewPassenger) return;
+    const reason = reviewRejectReason.trim();
+    if (status === 'rejected' && reason.length < 5) {
+      setReviewError('Please tell the passenger why the submission was not approved.');
+      return;
+    }
+    setReviewBusy(true);
+    setReviewError('');
+    try {
+      const adminInfo = userProfile?.uid
+        ? { adminId: userProfile.uid, adminEmail: userProfile.email || 'admin@zaka.io' }
+        : undefined;
+      await firestoreService.reviewPassengerVerification(reviewPassenger.userId, status, reason, adminInfo);
+      setReviewPassenger(null);
+      await loadAdminData();
+    } catch (err) {
+      console.error('Passenger review failed:', err);
+      setReviewError('The decision could not be saved. Please try again.');
+    } finally {
+      setReviewBusy(false);
+    }
+  };
 
   const handleApproveDriver = async (driverId: string) => {
     const adminInfo = userProfile?.uid
@@ -620,11 +683,20 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
                 <h3 className="text-base font-bold text-ink">Registered Passengers</h3>
-                <p className="text-xs text-ink-3">Live profiles stored in Firestore</p>
+                <p className="text-xs text-ink-3">
+                  Passengers can request rides only after their ID document and live photo are approved here.
+                </p>
               </div>
-              <span className="text-xs font-bold text-neutral-400">
-                {users.filter((u) => u.role === 'passenger').length} Users
-              </span>
+              <div className="flex items-center gap-2">
+                {pendingPassengerCount > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+                    {pendingPassengerCount} awaiting review
+                  </span>
+                )}
+                <span className="text-xs font-bold text-neutral-400">
+                  {users.filter((u) => u.role === 'passenger').length} Users
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -634,28 +706,72 @@ export const AdminDashboard: React.FC = () => {
                     <th className="pb-2">Passenger</th>
                     <th className="pb-2">Phone</th>
                     <th className="pb-2">Email</th>
-                    <th className="pb-2">Status</th>
+                    <th className="pb-2">Identity</th>
                     <th className="pb-2">Joined Date</th>
+                    <th className="pb-2 text-right">Verification</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
                   {users
                     .filter((u) => u.role === 'passenger')
-                    .map((p) => (
-                      <tr key={p.uid} className="hover:bg-surface-2">
-                        <td className="py-3 font-bold text-ink">{p.name}</td>
-                        <td className="py-3 text-ink-2">{p.phone}</td>
-                        <td className="py-3 text-ink-3">{p.email}</td>
-                        <td className="py-3">
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 uppercase">
-                            {p.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-neutral-400">
-                          {new Date(p.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
+                    // Submissions waiting for a decision come first
+                    .sort((a, b) => {
+                      const rank = (uid: string) => (passengerById.get(uid)?.verificationStatus === 'pending' ? 0 : 1);
+                      return rank(a.uid) - rank(b.uid);
+                    })
+                    .map((p) => {
+                      const pax = passengerById.get(p.uid);
+                      const idStatus = pax?.verificationStatus || 'unverified';
+                      return (
+                        <tr key={p.uid} className="hover:bg-surface-2">
+                          <td className="py-3 font-bold text-ink">{p.name}</td>
+                          <td className="py-3 text-ink-2">
+                            {p.phone}
+                            {pax?.phoneVerified && (
+                              <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                                OTP
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 text-ink-3">{p.email}</td>
+                          <td className="py-3">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
+                                idStatus === 'approved'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : idStatus === 'pending'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : idStatus === 'rejected'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-neutral-100 text-ink-3'
+                              }`}
+                            >
+                              {idStatus === 'unverified' ? 'Not submitted' : idStatus}
+                            </span>
+                          </td>
+                          <td className="py-3 text-neutral-400">
+                            {new Date(p.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 text-right">
+                            {pax && idStatus !== 'unverified' ? (
+                              <button
+                                type="button"
+                                onClick={() => openPassengerReview(pax)}
+                                className={`rounded-full px-3 py-1.5 text-[11px] font-bold cursor-pointer ${
+                                  idStatus === 'pending'
+                                    ? 'bg-ink text-white hover:bg-black'
+                                    : 'border border-line bg-white text-ink hover:bg-surface-2'
+                                }`}
+                              >
+                                {idStatus === 'pending' ? 'Review' : 'View'}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-neutral-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -1032,7 +1148,7 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-ink flex items-center gap-2">
-                      Peach Payments Gateway Integration
+                      VodaPay Gateway Integration
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                         gatewayConfig?.isConfigured
                           ? 'bg-emerald-100 text-emerald-800'
@@ -1060,20 +1176,20 @@ export const AdminDashboard: React.FC = () => {
                 <div className="rounded-card border border-line bg-surface-2 p-3">
                   <span className="text-[11px] font-bold uppercase text-neutral-400">Environment</span>
                   <p className="font-bold text-ink capitalize mt-0.5">
-                    {gatewayConfig?.env || 'Sandbox / Testsecure'}
+                    {gatewayConfig?.env || 'sandbox'}
                   </p>
                   <p className="text-[11px] text-ink-3 mt-1">
-                    Base URL: {gatewayConfig?.env === 'production' ? 'secure.peachpayments.com' : 'testsecure.peachpayments.com'}
+                    Base URL: {gatewayConfig?.env === 'production' ? 'api.vodapaygateway.vodacom.co.za' : 'api.vodapaygatewayuat.vodacom.co.za'}
                   </p>
                 </div>
 
                 <div className="rounded-card border border-line bg-surface-2 p-3">
                   <span className="text-[11px] font-bold uppercase text-neutral-400">Webhook Listener</span>
                   <p className="font-mono font-bold text-ink mt-0.5 truncate">
-                    /api/payments/peach/webhook
+                    /api/payments/vodapay/notify
                   </p>
                   <p className="text-[11px] text-ink-3 mt-1">
-                    Signature verification: HMAC-SHA256
+                    Authenticated by a one-time token per payment
                   </p>
                 </div>
 
@@ -1084,8 +1200,8 @@ export const AdminDashboard: React.FC = () => {
                   </p>
                   <p className="text-[11px] text-ink-3 mt-1">
                     {gatewayConfig?.isConfigured
-                      ? 'Checkout v2 endpoints active.'
-                      : 'Set PEACH_ENTITY_ID and PEACH_SECRET_TOKEN in .env'}
+                      ? 'Hosted checkout endpoints active.'
+                      : 'Set VODAPAY_API_KEY in the server environment'}
                   </p>
                 </div>
               </div>
@@ -1093,10 +1209,10 @@ export const AdminDashboard: React.FC = () => {
               {!gatewayConfig?.isConfigured && (
                 <div className="rounded-card border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900">
                   <p className="font-bold text-amber-950">
-                    ZAKA PAYMENT INTEGRATION IMPLEMENTED — AWAITING PEACH MERCHANT CREDENTIALS AND PRODUCTION ONBOARDING
+                    ZAKA PAYMENT INTEGRATION IMPLEMENTED — AWAITING VODAPAY API KEY
                   </p>
                   <p className="text-[11px] mt-1 text-amber-800">
-                    The ZAKA backend has completed end-to-end implementation for Peach Payments Hosted Checkout v2, HMAC signature calculation, shopper return routing, and webhook event processing. Once Peach Payments delivers your live merchant credentials, populate <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">PEACH_ENTITY_ID</code> and <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">PEACH_SECRET_TOKEN</code> to immediately enable live debit/credit card charges.
+                    The ZAKA backend has completed end-to-end implementation for VodaPay Gateway hosted checkout, shopper return routing, and payment notification processing. Set <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">VODAPAY_API_KEY</code> and <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">VODAPAY_ENV</code> on the server to enable debit/credit card charges.
                   </p>
                 </div>
               )}
@@ -1151,7 +1267,7 @@ export const AdminDashboard: React.FC = () => {
                               {p.transactionReference || p.merchantTransactionId || (p.id ? p.id.substring(0, 12) : 'REF-N/A')}
                             </td>
                             <td className="py-3 font-semibold text-ink-2 capitalize">
-                              {p.provider === 'peach' ? 'Peach Payments' : p.provider || 'Cash Direct'}
+                              {p.provider === 'vodapay' ? 'VodaPay' : p.provider || 'Cash Direct'}
                             </td>
                             <td className="py-3 font-bold text-ink">
                               {fareService.formatZAR(amount)}
@@ -1342,7 +1458,7 @@ export const AdminDashboard: React.FC = () => {
 
               {/* TIER CARDS GRID */}
               <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {(['economy', 'comfort', 'xl', 'moto'] as VehicleType[]).map((vt) => {
+                {ACTIVE_VEHICLE_TYPES.map((vt) => {
                   const current = editingPricing[vt] || ZAKA_DEFAULT_LAUNCH_PRICING[vt];
                   const isSaving = savingTier === vt;
 
@@ -1550,8 +1666,8 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* CALCULATED SIMULATOR TIERS */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                {(['economy', 'comfort', 'xl', 'moto'] as VehicleType[]).map((vt) => {
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                {ACTIVE_VEHICLE_TYPES.map((vt) => {
                   const conf = editingPricing[vt] || ZAKA_DEFAULT_LAUNCH_PRICING[vt];
                   const breakdown = fareService.calculateFareBreakdown(conf, simDistance, simDuration);
 
@@ -1968,6 +2084,167 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* MODAL 4: ADMIN DRIVER COMPLIANCE DOCUMENT PREVIEW */}
+      {/* PASSENGER IDENTITY REVIEW */}
+      {reviewPassenger && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Passenger identity review"
+          onClick={() => !reviewBusy && setReviewPassenger(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-modal"
+          >
+            <div className="flex items-center justify-between border-b border-line p-5">
+              <div>
+                <h3 className="text-base font-bold text-ink">{reviewPassenger.name}</h3>
+                <p className="text-[11px] text-ink-3">
+                  Identity submission
+                  {reviewPassenger.verificationSubmittedAt
+                    ? ` • ${new Date(reviewPassenger.verificationSubmittedAt).toLocaleString()}`
+                    : ''}
+                  {' • '}
+                  <span className="font-bold uppercase text-ink-2">{reviewPassenger.verificationStatus}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewPassenger(null)}
+                aria-label="Close review"
+                className="rounded-full p-1.5 text-neutral-400 hover:bg-surface-2 hover:text-ink cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-line bg-surface-2 p-4 text-xs sm:grid-cols-3">
+                <div>
+                  <dt className="text-[11px] text-ink-3">Date of Birth</dt>
+                  <dd className="font-bold text-ink">{(reviewPassenger.dateOfBirth || '—').replace(/-/g, '/')}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Gender</dt>
+                  <dd className="font-bold capitalize text-ink">{reviewPassenger.gender || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Nationality</dt>
+                  <dd className="font-bold text-ink">{reviewPassenger.nationality || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">ID / Passport Number</dt>
+                  <dd className="font-mono font-bold text-ink">{reviewPassenger.idNumber || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Mobile Number</dt>
+                  <dd className="font-bold text-ink">
+                    {reviewPassenger.phone ? formatPhoneDisplay(normalizePhoneNumber(reviewPassenger.phone)) : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-ink-3">Number confirmed by SMS</dt>
+                  <dd className={`font-bold ${reviewPassenger.phoneVerified ? 'text-success' : 'text-danger'}`}>
+                    {reviewPassenger.phoneVerified ? 'Yes' : 'No'}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {(['idDocument', 'selfie'] as PassengerVerificationImageKind[]).map((kind) => (
+                  <div key={kind} className="space-y-1.5">
+                    <span className="text-xs font-bold text-ink">{kind === 'idDocument' ? 'ID Document' : 'Live Photo'}</span>
+                    <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-card border border-line bg-surface-2">
+                      {reviewImages[kind]?.dataUrl ? (
+                        <button
+                          type="button"
+                          title="View full size"
+                          onClick={() => setReviewZoomUrl(reviewImages[kind]?.dataUrl || null)}
+                          className="h-full w-full cursor-zoom-in"
+                        >
+                          <img
+                            src={reviewImages[kind]?.dataUrl}
+                            alt={kind === 'idDocument' ? 'ID document' : 'Live photo'}
+                            className="h-full w-full object-contain"
+                          />
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-ink-3">
+                          {reviewImagesLoading ? 'Loading…' : 'Not available'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {reviewPassenger.verificationStatus === 'rejected' && reviewPassenger.rejectionReason && (
+                <p className="rounded-card border border-red-200 bg-red-50 p-3 text-xs font-bold text-danger">
+                  Previously rejected: {reviewPassenger.rejectionReason}
+                </p>
+              )}
+
+              {reviewError && (
+                <p role="alert" className="rounded-card border border-red-200 bg-red-50 p-3 text-xs font-bold text-danger">
+                  {reviewError}
+                </p>
+              )}
+
+              <div>
+                <label htmlFor="passenger-reject-reason" className="mb-1 block text-xs font-bold text-ink">
+                  Reason (required to reject or revoke, shown to the passenger)
+                </label>
+                <input
+                  id="passenger-reject-reason"
+                  type="text"
+                  value={reviewRejectReason}
+                  onChange={(e) => setReviewRejectReason(e.target.value)}
+                  placeholder="e.g. The ID photo is blurred. Please upload a clearer one."
+                  className="w-full rounded-input border border-line bg-surface-2 p-2.5 text-xs text-ink focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-line p-4">
+              <button
+                type="button"
+                disabled={reviewBusy}
+                onClick={() => handleReviewPassenger('rejected')}
+                className="rounded-full border border-red-300 bg-white px-4 py-2.5 text-xs font-bold text-danger hover:bg-red-50 disabled:opacity-50 cursor-pointer"
+              >
+                {reviewPassenger.verificationStatus === 'approved' ? 'Revoke Approval' : 'Reject'}
+              </button>
+              {reviewPassenger.verificationStatus !== 'approved' && (
+                <button
+                  id="btn-approve-passenger"
+                  type="button"
+                  disabled={reviewBusy}
+                  onClick={() => handleReviewPassenger('approved')}
+                  className="flex items-center gap-1.5 rounded-full bg-ink px-4 py-2.5 text-xs font-bold text-white hover:bg-black disabled:opacity-50 cursor-pointer"
+                >
+                  <Check className="h-4 w-4" />
+                  {reviewBusy ? 'Saving…' : 'Approve Passenger'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-size view of a passenger verification photo */}
+      {reviewZoomUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Verification photo"
+          onClick={() => setReviewZoomUrl(null)}
+          className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-4"
+        >
+          <img src={reviewZoomUrl} alt="Verification photo, full size" className="max-h-full max-w-full rounded-card object-contain" />
+        </div>
+      )}
+
       {previewDocModal?.isOpen && (
         <div
           role="dialog"

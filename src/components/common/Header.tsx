@@ -6,13 +6,15 @@
  * ◉ ZAKA                         ◯  ◯  ◯
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { firestoreService } from '../../firebase/firestoreService';
 import { NotificationRecord, UserRole } from '../../types';
 import { NotificationCenterModal } from './NotificationCenterModal';
 import { isRiderTarget } from '../../config/appTarget';
 import { notificationService } from '../../services/notificationService';
+import { emitGoHome } from '../../utils/appEvents';
+import { ownPhotoURL } from '../../utils/imageUtils';
 import {
   Bell,
   User,
@@ -53,6 +55,27 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationCenterModal, setShowNotificationCenterModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const photoURL = ownPhotoURL(userProfile?.photoURL);
+
+  // The account menu closes when the user clicks or taps anywhere outside it, or presses Escape
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowUserMenu(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showUserMenu]);
 
   useEffect(() => {
     if (userProfile?.uid) {
@@ -95,14 +118,21 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 w-full max-w-full bg-white border-b border-line transition-all">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 sm:px-8 h-15 sm:h-16 gap-4">
-        {/* Left: ZAKA Orange Wordmark */}
-        <div
+        {/* Left: ZAKA Orange Wordmark - always returns to the Home page */}
+        <button
+          id="btn-header-home"
+          type="button"
+          aria-label="ZAKA Home"
+          title="Home"
           onClick={() => {
             if (activeRole === 'driver' || userProfile?.role === 'driver' || userProfile?.activeRole === 'driver') {
               setActiveRole('driver');
             } else if (!isAdmin) {
               setActiveRole('passenger');
             }
+            setShowUserMenu(false);
+            setShowNotificationCenterModal(false);
+            emitGoHome();
           }}
           className="flex items-center gap-2.5 cursor-pointer select-none shrink-0 group transition-transform active:scale-[0.98]"
         >
@@ -114,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="text-xl sm:text-2xl font-bold tracking-tight text-primary-text leading-none transition-colors group-hover:text-primary-hover">
             ZAKA
           </span>
-        </div>
+        </button>
 
         {/* Right: Minimal Actions & Stylized Profile Button */}
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
@@ -159,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Stylized Profile Button */}
-          <div className="relative">
+          <div className="relative" ref={userMenuRef}>
             {isAuthenticated ? (
               <button
                 id="btn-header-profile"
@@ -169,10 +199,10 @@ export const Header: React.FC<HeaderProps> = ({
                 title={userProfile?.name || 'Your Account'}
                 className="group relative flex items-center gap-2 pl-1.5 pr-2.5 sm:pr-3 py-1 sm:py-1.5 rounded-full border border-black/[0.07] bg-white/95 hover:bg-surface-2 text-ink hover:shadow-card active:scale-[0.98] transition-all cursor-pointer"
               >
-                {userProfile?.photoURL ? (
+                {photoURL ? (
                   <img
-                    src={userProfile.photoURL}
-                    alt={userProfile.name}
+                    src={photoURL}
+                    alt={userProfile?.name || 'Your account'}
                     className="h-7 w-7 sm:h-7.5 sm:w-7.5 rounded-full object-cover ring-1 ring-black/10"
                   />
                 ) : (

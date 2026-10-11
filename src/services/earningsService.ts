@@ -31,7 +31,7 @@ export const earningsService = {
    * - Commission split: 85% Driver Take-Home, 15% ZAKA Platform Commission
    * - Confirmed earnings are finalized ONLY when payment status is confirmed ('paid'):
    *   * Cash: Driver confirmed cash collection
-   *   * Electronic (Peach): Verified successful transaction
+   *   * Electronic (VodaPay): Verified successful transaction
    * - Pending payments are tracked separately under pendingSettlement
    */
   calculateDriverEarnings(

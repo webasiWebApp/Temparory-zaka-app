@@ -17,9 +17,12 @@ import {
   FareBreakdown,
   PaymentMethod,
   RecentDestination,
+  SavedPlace,
+  ACTIVE_VEHICLE_TYPES,
 } from '../../types';
 import { fareService, ZAKA_DEFAULT_LAUNCH_PRICING } from '../../services/fareService';
 import { hapticsService } from '../../services/hapticsService';
+import { onGoHome } from '../../utils/appEvents';
 import { InteractiveMap } from '../common/InteractiveMap';
 import { DestinationSearchModal } from './DestinationSearchModal';
 import {
@@ -49,7 +52,28 @@ import {
   Building,
   Home,
   Check,
+  Car,
+  CarFront,
+  Bus,
+  Briefcase,
+  Plane,
+  Star,
 } from 'lucide-react';
+
+// One simple line icon per ride type
+const RIDE_TYPE_ICONS: Record<VehicleType, React.ComponentType<{ className?: string }>> = {
+  economy: Car,
+  comfort: CarFront,
+  xl: Bus,
+  moto: Car,
+};
+
+const SAVED_PLACE_ICONS: Record<SavedPlace['icon'], React.ComponentType<{ className?: string }>> = {
+  home: Home,
+  work: Briefcase,
+  airport: Plane,
+  favorite: Star,
+};
 
 interface PassengerHomeProps {
   onOpenMenu?: () => void;
@@ -66,7 +90,9 @@ interface PassengerHomeProps {
     durationMin: number;
     paymentMethod: PaymentMethod;
     fareBreakdown?: FareBreakdown;
-  }) => void;
+  }) => void | Promise<void>;
+  // Why the last ride request could not be made (shown next to the Confirm button)
+  requestError?: string | null;
 }
 
 // Fallback initial location restricted strictly to Demo/Development mode
@@ -114,8 +140,10 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
   onOpenHistory,
   onOpenWallet,
   onConfirmRideReady,
+  requestError,
 }) => {
-  const { userProfile, isDemoTestMode } = useAuth();
+  const { userProfile, passengerProfile, isDemoTestMode } = useAuth();
+  const savedPlaces = passengerProfile?.savedPlaces || [];
   const isDemo = Boolean(userProfile?.isDemo || isDemoTestMode);
 
   // Location State
@@ -157,6 +185,21 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
   const [showSafetyModal, setShowSafetyModal] = useState<boolean>(false);
   const [showFaresModal, setShowFaresModal] = useState<boolean>(false);
   const [isSubmittingRide, setIsSubmittingRide] = useState<boolean>(false);
+  const [confirmNotice, setConfirmNotice] = useState<string | null>(null);
+
+  // ZAKA logo pressed: back to the start of the booking flow
+  useEffect(
+    () =>
+      onGoHome(() => {
+        setDestination(null);
+        setSearchModalOpen(false);
+        setIsSelectingPickup(false);
+        setShowSafetyModal(false);
+        setShowFaresModal(false);
+        setConfirmNotice(null);
+      }),
+    []
+  );
 
   // Real-time online drivers for map radar
   const [onlineDrivers, setOnlineDrivers] = useState<any[]>([]);
@@ -305,8 +348,7 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
       routeDistanceKm,
       routeDurationMin
     );
-    const types: VehicleType[] = ['economy', 'comfort', 'xl', 'moto'];
-    return types.map((type) => {
+    return ACTIVE_VEHICLE_TYPES.map((type) => {
       const breakdown = optionsMap[type];
       const config = pricingConfigs[type] || ZAKA_DEFAULT_LAUNCH_PRICING[type];
       return {
@@ -376,12 +418,21 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
 
   // Handle Confirm Ride
   const handleConfirmRide = async () => {
-    if (!pickup || !destination || !selectedOption) return;
+    if (isSubmittingRide || !destination || !selectedOption) return;
+    setConfirmNotice(null);
+
+    // Without a pickup point nothing can be requested: say so instead of ignoring the tap
+    if (!pickup) {
+      setConfirmNotice('Please set your pickup location before confirming your ride.');
+      handleOpenPickupSearch();
+      return;
+    }
 
     hapticsService.medium().catch(() => {});
     setIsSubmittingRide(true);
     try {
-      onConfirmRideReady?.({
+      // Awaited so the button stays in its "Requesting" state until the ride exists or has failed
+      await onConfirmRideReady?.({
         pickup,
         destination,
         rideType: selectedRideType,
@@ -393,6 +444,7 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
       });
     } catch (e) {
       console.error('Error confirming ride:', e);
+      setConfirmNotice('We could not request your ride. Please try again.');
     } finally {
       setIsSubmittingRide(false);
     }
@@ -596,11 +648,62 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
               </div>
             </button>
 
+            {/* Saved (favourite) places: one tap pins the place on the map as the destination */}
+            <div className="pt-2 border-t border-black/[0.04]">
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-2">
+                  Saved Places
+                </span>
+                <button
+                  id="btn-manage-saved-places"
+                  type="button"
+                  onClick={onOpenProfile}
+                  className="text-[11px] font-semibold text-primary-text hover:text-primary-hover cursor-pointer"
+                >
+                  {savedPlaces.length > 0 ? 'Manage' : 'Add a place'}
+                </button>
+              </div>
+              {savedPlaces.length === 0 ? (
+                <p className="px-0.5 text-[11px] text-ink-3">
+                  Save your home, work and other favourite addresses for one-tap booking.
+                </p>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {savedPlaces.map((place) => {
+                    const PlaceIcon = SAVED_PLACE_ICONS[place.icon] || Star;
+                    return (
+                      <button
+                        key={place.id}
+                        type="button"
+                        title={place.address}
+                        onClick={() =>
+                          handleSelectDestination({
+                            address: place.address,
+                            coordinates: place.location,
+                            name: place.label,
+                          })
+                        }
+                        className="flex shrink-0 items-center gap-2 rounded-full border border-neutral-200/80 bg-white py-1.5 pl-2 pr-3.5 text-left hover:border-primary hover:bg-primary-50 transition-colors cursor-pointer max-w-[220px]"
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-text">
+                          <PlaceIcon className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-ink truncate">{place.label}</span>
+                          <span className="block text-[11px] text-ink-2 truncate">{place.address}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Recent Destinations Section */}
             <div className="pt-2 border-t border-black/[0.04]">
               <div className="flex items-center justify-between mb-2 px-0.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-2">
-                  Recent Destinations
+                  {recentDestinations.length > 0 ? 'Recent Destinations' : 'Popular Destinations'}
                 </span>
               </div>
 
@@ -774,6 +877,7 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
             <div className="space-y-2.5">
               {calculatedRideOptions.map((opt) => {
                 const isSelected = selectedRideType === opt.type;
+                const RideIcon = RIDE_TYPE_ICONS[opt.type];
 
                 return (
                   <button
@@ -789,16 +893,16 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
                         : 'border border-neutral-200/80 bg-white hover:border-neutral-300'
                     }`}
                   >
-                    {/* Vehicle Icon / Glyph */}
+                    {/* Vehicle Icon */}
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold ${
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
                           isSelected
                             ? 'bg-primary text-on-primary '
                             : 'bg-surface-2 text-ink'
                         }`}
                       >
-                        {opt.type === 'moto' ? '🏍️' : opt.type === 'comfort' ? '✨' : opt.type === 'xl' ? '🚙' : '🚗'}
+                        <RideIcon className="h-5 w-5" />
                       </div>
 
                       {/* Vehicle Info */}
@@ -922,7 +1026,17 @@ export const PassengerHome: React.FC<PassengerHomeProps> = ({
             </div>
 
             {/* Primary Action Button: Confirm Ride */}
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
+              {(confirmNotice || requestError) && (
+                <div
+                  id="confirm-ride-error"
+                  role="alert"
+                  className="flex items-start gap-2 rounded-card border border-red-200 bg-red-50 p-3 text-xs font-bold text-danger"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{confirmNotice || requestError}</span>
+                </div>
+              )}
               <button
                 id="btn-confirm-ride-action"
                 type="button"

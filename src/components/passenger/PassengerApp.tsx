@@ -28,6 +28,7 @@ import { RideHistoryModal } from './RideHistoryModal';
 import { ZakaWelcomeScreen } from './ZakaWelcomeScreen';
 import { paymentService } from '../../services/paymentService';
 import { fareService } from '../../services/fareService';
+import { onGoHome } from '../../utils/appEvents';
 
 interface PassengerAppProps {
   onOpenProfile?: () => void;
@@ -73,26 +74,57 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
 
-  // Returning from Peach secure checkout after a wallet top-up: confirm it with the server
+  // Returning from VodaPay secure checkout after a wallet top-up: confirm it with the server
   useEffect(() => {
     if (!userProfile?.uid) return;
     const params = new URLSearchParams(window.location.search);
     const topupId = params.get('walletTopup');
-    if (!topupId || params.get('peachReturn') !== 'true') return;
+    if (!topupId || params.get('paymentReturn') !== 'true') return;
 
     window.history.replaceState({}, document.title, window.location.pathname);
     setWalletNotice('Confirming your top-up…');
     setIsWalletOpen(true);
     setActiveNavTab('wallet');
-    paymentService.verifyWalletTopup(topupId).then((res) => setWalletNotice(res.message));
+
+    // VodaPay confirms to the server separately from this browser redirect, so the confirmation can
+    // land a few seconds later: check a handful of times before giving up.
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = (attempt: number) => {
+      paymentService.verifyWalletTopup(topupId).then((res) => {
+        if (cancelled) return;
+        if (res.success || attempt >= 6) {
+          setWalletNotice(res.message);
+          return;
+        }
+        timer = setTimeout(() => check(attempt + 1), 5000);
+      });
+    };
+    check(1);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [userProfile?.uid]);
 
   // Ride request errors dismiss themselves
   useEffect(() => {
     if (!requestError) return;
-    const timer = setTimeout(() => setRequestError(null), 7000);
+    const timer = setTimeout(() => setRequestError(null), 12000);
     return () => clearTimeout(timer);
   }, [requestError]);
+
+  // ZAKA logo pressed: back to the Home tab with the wallet and trip history closed
+  useEffect(
+    () =>
+      onGoHome(() => {
+        setActiveNavTab('home');
+        setIsWalletOpen(false);
+        setIsInternalHistoryOpen(false);
+        setWalletNotice(null);
+      }),
+    []
+  );
 
   // When Profile is closed or dismissed, explicitly set the active navigation tab to: "home"
   useEffect(() => {
@@ -290,6 +322,8 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
       onOpenAuth?.();
       return;
     }
+    // A second tap while the first request is still being created must not book a second ride
+    if (isRequesting) return;
 
     setRequestError(null);
 
@@ -416,6 +450,7 @@ export const PassengerApp: React.FC<PassengerAppProps> = ({
           onOpenHistory={onOpenHistory || (() => setIsInternalHistoryOpen(true))}
           onOpenWallet={() => handleNavChange('wallet')}
           onConfirmRideReady={handleConfirmRideRequest}
+          requestError={requestError}
         />
 
         {/* iPhone-Style Frosted Glass Floating Navigation */}

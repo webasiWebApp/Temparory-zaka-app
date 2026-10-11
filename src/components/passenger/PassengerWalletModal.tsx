@@ -5,7 +5,7 @@
  * Visuals: Clean white surfaces, soft shadows, rounded-card cards, circular buttons, ZAKA orange accent
  *
  * The balance and the transaction list are read live from Firestore. The balance itself is only ever
- * changed by the backend: credited when Peach Payments confirms a top-up, debited when a wallet ride is settled.
+ * changed by the backend: credited when VodaPay confirms a top-up, debited when a wallet ride is settled.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -128,7 +128,7 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
       id: 'card',
       title: 'Credit / Debit Card',
       subtitle: cardAvailable
-        ? 'Visa & Mastercard via Peach Payments secure checkout'
+        ? 'Visa & Mastercard via VodaPay secure checkout'
         : 'Not available yet',
       icon: <CreditCard className="h-5 w-5" />,
       disabled: !cardAvailable,
@@ -328,7 +328,7 @@ export const PassengerWalletModal: React.FC<PassengerWalletModalProps> = ({
         {/* Security Note */}
         <div className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-ink-3 font-medium">
           <ShieldCheck className="h-4 w-4 text-success" />
-          <span>Card details are handled by Peach Payments and never stored by ZAKA</span>
+          <span>Card details are handled by VodaPay and never stored by ZAKA</span>
         </div>
 
         {/* Primary Action Button */}

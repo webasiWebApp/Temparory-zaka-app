@@ -52,8 +52,16 @@ export class RoutingService {
     c1: LocationCoordinates,
     c2: LocationCoordinates
   ): number {
-    const km = this.calculateHaversineDistanceKm(c1.latitude, c1.longitude, c2.latitude, c2.longitude);
-    return km * 1000;
+    // Exact straight-line distance. calculateHaversineDistanceKm applies a road factor and rounds to
+    // 100 m, which is right for fares but makes metre-level checks (15 m throttle, arrival) meaningless.
+    const R = 6371000;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(c2.latitude - c1.latitude);
+    const dLon = toRad(c2.longitude - c1.longitude);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(c1.latitude)) * Math.cos(toRad(c2.latitude)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   /**
@@ -124,7 +132,8 @@ export class RoutingService {
   }
 
   /**
-   * Fetches real driving route following actual roads using Google Maps DirectionsService or fallback OSRM
+   * Fetches the real driving route along the road network.
+   * Order: Google Routes API, Google Directions (legacy), then the open OSRM router.
    */
   async getRoute(
     pickup: LocationCoordinates,
@@ -136,7 +145,40 @@ export class RoutingService {
       return cached.route;
     }
 
-    // Try Google Maps DirectionsService if available in window.google
+    const g = typeof window !== 'undefined' ? (window as any).google : undefined;
+
+    // 1. Google Routes API (the "Routes" service enabled on the ZAKA Maps key)
+    if (g?.maps?.importLibrary) {
+      try {
+        const { Route } = await g.maps.importLibrary('routes');
+        if (Route?.computeRoutes) {
+          const { routes } = await Route.computeRoutes({
+            origin: { lat: pickup.latitude, lng: pickup.longitude },
+            destination: { lat: destination.latitude, lng: destination.longitude },
+            travelMode: 'DRIVING',
+            fields: ['path', 'distanceMeters', 'durationMillis'],
+          });
+          const best = routes?.[0];
+          const coordinates: [number, number][] = (best?.path || []).map((point: any) => [
+            typeof point.lat === 'function' ? point.lat() : point.lat,
+            typeof point.lng === 'function' ? point.lng() : point.lng,
+          ]);
+          if (coordinates.length > 1) {
+            const distanceKm =
+              Math.round(((best.distanceMeters || 0) / 1000) * 10) / 10 ||
+              this.calculateHaversineDistanceKm(pickup.latitude, pickup.longitude, destination.latitude, destination.longitude);
+            const durationMin = Math.round((best.durationMillis || 0) / 60000) || this.estimateDurationMinutes(distanceKm);
+            const routeResult: RouteGeometry = { coordinates, distanceKm, durationMin: Math.max(1, durationMin) };
+            this.routeCache.set(cacheKey, { timestamp: Date.now(), route: routeResult });
+            return routeResult;
+          }
+        }
+      } catch (routesErr) {
+        console.warn('Google Routes API unavailable; trying Directions:', routesErr);
+      }
+    }
+
+    // 2. Google Maps DirectionsService (legacy Directions API)
     if (typeof window !== 'undefined' && (window as any).google?.maps?.DirectionsService) {
       try {
         const directionsService = new (window as any).google.maps.DirectionsService();
@@ -185,7 +227,7 @@ export class RoutingService {
       }
     }
 
-    // Secondary driving road route via OSRM
+    // 3. Driving road route via OSRM
     if (this.activeRouteController) {
       this.activeRouteController.abort();
     }

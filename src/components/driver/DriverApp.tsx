@@ -67,7 +67,8 @@ export const DriverApp: React.FC = () => {
 
   const isPending = !driverProfile || driverProfile.verificationStatus !== 'approved';
 
-  const [isOnline, setIsOnline] = useState<boolean>(driverProfile?.online ?? true);
+  // Offline until the profile says otherwise, so nothing online-only runs for a missing or pending profile
+  const [isOnline, setIsOnline] = useState<boolean>(driverProfile?.online ?? false);
   const [activeTrip, setActiveTrip] = useState<RideDocument | null>(null);
   const [justCompletedTrip, setJustCompletedTrip] = useState<RideDocument | null>(null);
   const [incomingRequests, setIncomingRequests] = useState<RideDocument[]>([]);
@@ -103,6 +104,10 @@ export const DriverApp: React.FC = () => {
     activeTripIdRef.current = activeTrip?.id || null;
   }, [activeTrip?.id]);
 
+  const lastAcceptedFixAtRef = useRef<number>(0);
+  // Rides this driver declined or let time out: kept out of the list when the listener delivers them again
+  const declinedRideIdsRef = useRef<Set<string>>(new Set());
+
   const mountedRef = useRef<boolean>(true);
   const userProfileUidRef = useRef<string | null>(null);
   useEffect(() => {
@@ -118,13 +123,23 @@ export const DriverApp: React.FC = () => {
   // Sync online status with driverProfile
   useEffect(() => {
     if (driverProfile) {
-      setIsOnline(driverProfile.online);
+      setIsOnline(Boolean(driverProfile.online));
     }
-  }, [driverProfile]);
+  }, [driverProfile?.online]);
 
   // Toggle online/offline status in Firestore
+  const isTogglingRef = useRef<boolean>(false);
   const handleToggleOnline = async () => {
-    if (!userProfile?.uid) return;
+    if (!userProfile?.uid || isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    try {
+      await toggleOnline(userProfile.uid);
+    } finally {
+      isTogglingRef.current = false;
+    }
+  };
+
+  const toggleOnline = async (uid: string) => {
     setToggleOnlineError(null);
     const newStatus = !isOnline;
 
@@ -146,7 +161,7 @@ export const DriverApp: React.FC = () => {
         setGpsState('LOCATION_GRANTED');
         setGpsErrorMsg(null);
 
-        await firestoreService.toggleDriverOnlineStatus(userProfile.uid, true, freshCoords);
+        await firestoreService.toggleDriverOnlineStatus(uid, true, freshCoords);
         setIsOnline(true);
         await refreshProfiles();
         return;
@@ -160,7 +175,7 @@ export const DriverApp: React.FC = () => {
     }
 
     try {
-      await firestoreService.toggleDriverOnlineStatus(userProfile.uid, newStatus, driverLocation);
+      await firestoreService.toggleDriverOnlineStatus(uid, newStatus, driverLocation);
       setIsOnline(newStatus);
       await refreshProfiles();
     } catch (err: any) {
@@ -222,9 +237,11 @@ export const DriverApp: React.FC = () => {
           longitude: Number(pos.coords.longitude.toFixed(6)),
         };
 
-        // Jump rejection (anomalous teleportation > 5000m)
+        // Jump rejection (anomalous teleportation > 5000m). Only measured against a fix accepted in the
+        // last 10 s: against an older or default position a real move would be rejected forever.
         const currentLoc = driverLocationRef.current;
-        if (currentLoc && currentLoc.latitude !== 0) {
+        const sinceLastFix = Date.now() - lastAcceptedFixAtRef.current;
+        if (currentLoc && currentLoc.latitude !== 0 && sinceLastFix < 10000) {
           const jumpDist = mapService.distanceMeters(currentLoc, coords);
           if (jumpDist > 5000) {
             console.warn('Discarding extreme GPS jump anomaly:', jumpDist, 'meters');
@@ -233,6 +250,7 @@ export const DriverApp: React.FC = () => {
         }
 
         // Always update local state immediately for responsive local rendering
+        lastAcceptedFixAtRef.current = Date.now();
         setDriverLocation(coords);
         setGpsState('LOCATION_GRANTED');
         setGpsErrorMsg(null);
@@ -352,9 +370,10 @@ export const DriverApp: React.FC = () => {
   }, [userProfile?.uid, isDemo]);
 
   // Listen to incoming searching rides across the platform
+  const hasActiveTrip = Boolean(activeTrip);
   useEffect(() => {
-    if (!isOnline || activeTrip) {
-      setIncomingRequests([]);
+    if (!isOnline || hasActiveTrip) {
+      setIncomingRequests((prev) => (prev.length ? [] : prev));
       return;
     }
 
@@ -365,6 +384,7 @@ export const DriverApp: React.FC = () => {
         : 0;
 
       const validSearching = rides.filter((r) => {
+        if (declinedRideIdsRef.current.has(r.id)) return false;
         if (!resetTimestamp) return true;
         const reqTime = new Date(r.requestedAt).getTime();
         return reqTime > resetTimestamp || r.id === activeDemoRideId;
@@ -374,7 +394,7 @@ export const DriverApp: React.FC = () => {
     }, Boolean(userProfile?.isDemo));
 
     return () => unsubscribe();
-  }, [isOnline, activeTrip, userProfile?.isDemo, activeDemoRideId]);
+  }, [isOnline, hasActiveTrip, userProfile?.isDemo, activeDemoRideId]);
 
   // Listen to assigned active rides for this driver
   useEffect(() => {
@@ -401,14 +421,17 @@ export const DriverApp: React.FC = () => {
           r.status === 'in_progress'
       );
 
-      // Detect trip completion
-      if (activeTrip && !active) {
-        const completed = validRides.find((r) => r.id === activeTrip.id && r.status === 'completed');
+      // Detect trip completion. The trip id comes from a ref so this listener is not torn down and
+      // re-read from Firestore every time a trip starts or ends.
+      const previousTripId = activeTripIdRef.current;
+      if (previousTripId && !active) {
+        const completed = validRides.find((r) => r.id === previousTripId && r.status === 'completed');
         if (completed) {
           setJustCompletedTrip(completed);
         }
       }
 
+      activeTripIdRef.current = active?.id || null;
       setActiveTrip(active || null);
     });
 
@@ -421,7 +444,7 @@ export const DriverApp: React.FC = () => {
       unsubscribeRides();
       unsubscribePayments();
     };
-  }, [userProfile?.uid, activeTrip?.id, activeDemoRideId]);
+  }, [userProfile?.uid, activeDemoRideId]);
 
   // An online driver with no trip must be available for dispatch. This covers a passenger cancelling
   // after acceptance (the passenger cannot write to the driver's profile). Short delay so a ride that
@@ -517,6 +540,7 @@ export const DriverApp: React.FC = () => {
 
   // Decline an incoming ride
   const handleDeclineRide = (rideId: string) => {
+    declinedRideIdsRef.current.add(rideId);
     setIncomingRequests((prev) => prev.filter((r) => r.id !== rideId));
   };
 

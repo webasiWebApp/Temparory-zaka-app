@@ -107,6 +107,12 @@ button, a, [role="button"], [role="tab"] {
   user-select: none;
 }
 
+/* Black-and-white map: only the base map image tiles are desaturated. The pickup and destination
+   markers (HTML) and the route line (its own canvas layer) are untouched and stay in colour. */
+.zaka-map-mono .gm-style img {
+  filter: grayscale(1) contrast(1.08);
+}
+
 /* Apple-like Soft Glass Bubble Utilities */
 .glass-bubble {
   background: var(--color-surface);

@@ -28,6 +28,9 @@ import { handleFirestoreError, OperationType } from './firestoreErrors';
 import {
   UserProfile,
   PassengerProfile,
+  PassengerVerificationImage,
+  PassengerVerificationImageKind,
+  ACTIVE_VEHICLE_TYPES,
   DriverProfile,
   DriverVehicle,
   DriverDocumentRecord,
@@ -605,8 +608,140 @@ export const firestoreService = {
       if (e?.code === 'permission-denied') {
         handleFirestoreError(e, OperationType.GET, `passengers/${userId}`);
       }
+      // A failed read is not a missing profile: returning null here would make callers re-create the
+      // profile with defaults and overwrite the passenger's saved places and trip history.
       console.warn('Notice reading passenger profile:', e);
-      return null;
+      throw e;
+    }
+  },
+
+  // ================= PASSENGER IDENTITY VERIFICATION =================
+
+  /**
+   * Stores one identity photo (ID document or live selfie) in the passenger's private verification
+   * sub-collection. Only the passenger and Admin can read it.
+   */
+  async savePassengerVerificationImage(
+    userId: string,
+    kind: PassengerVerificationImageKind,
+    dataUrl: string,
+    fileName: string
+  ): Promise<void> {
+    const record: PassengerVerificationImage = {
+      kind,
+      dataUrl,
+      fileName,
+      fileType: 'image/jpeg',
+      uploadedAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'passengers', userId, 'verification', kind), record);
+  },
+
+  async getPassengerVerificationImages(
+    userId: string
+  ): Promise<Partial<Record<PassengerVerificationImageKind, PassengerVerificationImage>>> {
+    const snap = await getDocs(collection(db, 'passengers', userId, 'verification'));
+    const images: Partial<Record<PassengerVerificationImageKind, PassengerVerificationImage>> = {};
+    snap.docs.forEach((d) => {
+      if (d.id === 'idDocument' || d.id === 'selfie') {
+        images[d.id] = d.data() as PassengerVerificationImage;
+      }
+    });
+    return images;
+  },
+
+  async deletePassengerVerificationImages(userId: string): Promise<void> {
+    await Promise.all(
+      (['idDocument', 'selfie'] as PassengerVerificationImageKind[]).map((kind) =>
+        deleteDoc(doc(db, 'passengers', userId, 'verification', kind)).catch(() => {})
+      )
+    );
+  },
+
+  /**
+   * Passenger submits their identity details for review. Both photos must already be saved.
+   * The security rules freeze these details from here on; only Admin can approve or reject.
+   */
+  async submitPassengerVerification(
+    userId: string,
+    details: {
+      name: string;
+      dateOfBirth: string;
+      gender: 'male' | 'female';
+      nationality: string;
+      idNumber: string;
+      idDocumentFileName: string;
+      selfieFileName: string;
+    }
+  ): Promise<Partial<PassengerProfile>> {
+    const now = new Date().toISOString();
+    // The account name is written first: once the submission is pending the rules no longer allow it to change
+    await setDoc(doc(db, 'users', userId), { name: details.name, updatedAt: now }, { merge: true });
+    const changes: Partial<PassengerProfile> = {
+      name: details.name,
+      dateOfBirth: details.dateOfBirth,
+      gender: details.gender,
+      nationality: details.nationality,
+      idNumber: details.idNumber,
+      verificationStatus: 'pending',
+      verificationSubmittedAt: now,
+      verificationDocuments: {
+        idDocument: { fileName: details.idDocumentFileName, uploadedAt: now },
+        selfie: { fileName: details.selfieFileName, uploadedAt: now },
+      },
+      updatedAt: now,
+    };
+    await setDoc(doc(db, 'passengers', userId), changes, { merge: true });
+    return changes;
+  },
+
+  /** Admin: every real passenger profile (identity details and verification status) */
+  async getAllPassengers(): Promise<PassengerProfile[]> {
+    const snap = await getDocs(query(collection(db, 'passengers'), limit(300)));
+    return snap.docs.map((d) => d.data() as PassengerProfile).filter((p) => !p.isDemo);
+  },
+
+  /** Admin: approve or reject a passenger's identity submission */
+  async reviewPassengerVerification(
+    userId: string,
+    status: 'approved' | 'rejected',
+    rejectionReason: string,
+    adminInfo?: { adminId: string; adminEmail: string }
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    await updateDoc(doc(db, 'passengers', userId), {
+      verificationStatus: status,
+      rejectionReason: status === 'rejected' ? rejectionReason : '',
+      verificationReviewedAt: now,
+      verificationReviewedBy: adminInfo?.adminId || '',
+      updatedAt: now,
+    });
+
+    await this.sendNotification({
+      userId,
+      title: status === 'approved' ? 'Identity verified' : 'Identity verification unsuccessful',
+      message:
+        status === 'approved'
+          ? 'Your identity has been verified. You can now request rides with ZAKA.'
+          : `We could not verify your identity: ${rejectionReason || 'please submit your details again.'}`,
+      type: 'system',
+      read: false,
+      createdAt: now,
+    });
+
+    if (adminInfo) {
+      await this.recordAuditLog({
+        adminId: adminInfo.adminId,
+        adminEmail: adminInfo.adminEmail,
+        action: status === 'approved' ? 'approve_passenger' : 'reject_passenger',
+        targetId: userId,
+        targetType: 'passenger',
+        details:
+          status === 'approved'
+            ? 'Passenger identity approved'
+            : `Passenger identity rejected: ${rejectionReason || 'no reason given'}`,
+        timestamp: now,
+      });
     }
   },
 
@@ -1317,7 +1452,7 @@ export const firestoreService = {
               currency: 'ZAR',
               paymentMethod: ridePaymentMethod,
               paymentStatus: 'pending',
-              provider: ridePaymentMethod === 'cash' ? 'cash' : ridePaymentMethod === 'wallet' ? 'zaka-wallet' : 'peach',
+              provider: ridePaymentMethod === 'cash' ? 'cash' : ridePaymentMethod === 'wallet' ? 'zaka-wallet' : 'vodapay',
               transactionReference: `ZAK-${Date.now().toString(36).toUpperCase()}`,
               isDemo: isDemoRide,
               createdAt: completedTime,
@@ -1814,6 +1949,19 @@ export const firestoreService = {
    * Submit Rating and update recipient aggregate rating securely
    */
   async submitRating(rating: RatingRecord): Promise<void> {
+    // Real accounts: the server checks the caller took part in the completed ride, stores one rating
+    // per ride and updates the recipient's average. Only isolated demo sessions still write directly.
+    if (!auth.currentUser?.isAnonymous && !rating.isDemo) {
+      const { ok, data } = await apiJson<{ success?: boolean; error?: string }>('/api/ratings/submit', {
+        method: 'POST',
+        json: { rideId: rating.rideId, rating: rating.rating, comment: rating.comment || '', tip: rating.tip || 0 },
+      });
+      if (!ok || !data.success) {
+        throw new Error(data.error || 'Could not save your rating. Please try again.');
+      }
+      return;
+    }
+
     try {
       // 1. Check for duplicate rating by this user on this ride
       const existing = await this.getRatingForRideAndUser(rating.rideId, rating.fromUserId);
@@ -2458,8 +2606,7 @@ export const firestoreService = {
       const pSnap = await getDocs(collection(db, 'pricing'));
       if (!pSnap.empty) return;
 
-      const types: VehicleType[] = ['economy', 'comfort', 'xl', 'moto'];
-      for (const t of types) {
+      for (const t of ACTIVE_VEHICLE_TYPES) {
         const conf = ZAKA_DEFAULT_LAUNCH_PRICING[t];
         const pRef = doc(db, 'pricing', t);
         await setDoc(pRef, conf);
