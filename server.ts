@@ -31,6 +31,12 @@ import {
   runTransaction,
   deleteField,
 } from 'firebase/firestore';
+import {
+  PhoneOtpError,
+  sendVerificationCode,
+  checkVerificationCode,
+  readVerificationToken,
+} from './server/phoneOtp';
 
 // Load environment variables from .env
 dotenv.config();
@@ -500,6 +506,93 @@ app.get('/api/auth/check-phone', rateLimit(60000, 10), async (req: Request, res:
   } catch (err: any) {
     console.error('[ZAKA Server] check-phone error:', err);
     res.json({ isRegistered: false });
+  }
+});
+
+// Phone number verification by SMS code (Africa's Talking). Only South African mobile numbers.
+function canonicalSaPhone(raw: unknown): string {
+  if (typeof raw !== 'string' || raw.length > 32) return '';
+  return getPhoneVariants(raw).find((v) => /^\+27[1-9]\d{8}$/.test(v)) || '';
+}
+
+function sendOtpError(res: Response, err: any, fallback: string) {
+  if (err instanceof PhoneOtpError) {
+    res.status(err.status).json({ success: false, error: err.message });
+    return;
+  }
+  console.error('[ZAKA Server] phone verification error:', err?.message || err);
+  res.status(500).json({ success: false, error: fallback });
+}
+
+app.post('/api/phone/send-code', rateLimit(60000, 5), async (req: Request, res: Response) => {
+  const phone = canonicalSaPhone(req.body?.phone);
+  if (!phone) {
+    res.status(400).json({ success: false, error: 'Please enter a valid South African mobile number (e.g. 082 123 4567).' });
+    return;
+  }
+  try {
+    const { resendInSeconds } = await sendVerificationCode(phone);
+    res.json({ success: true, phone, resendInSeconds });
+  } catch (err: any) {
+    sendOtpError(res, err, 'We could not send the code. Please try again.');
+  }
+});
+
+app.post('/api/phone/verify-code', rateLimit(60000, 20), (req: Request, res: Response) => {
+  const phone = canonicalSaPhone(req.body?.phone);
+  const code = String(req.body?.code || '').trim();
+  if (!phone || !/^\d{6}$/.test(code)) {
+    res.status(400).json({ success: false, error: 'Please enter the 6-digit code from the SMS.' });
+    return;
+  }
+  try {
+    const verificationToken = checkVerificationCode(phone, code);
+    res.json({ success: true, phone, verificationToken });
+  } catch (err: any) {
+    sendOtpError(res, err, 'We could not verify the code. Please try again.');
+  }
+});
+
+// Records a number verified by SMS code on the caller's passenger profile. The number must be (or
+// become) reserved for the caller in phoneIndex; 'phoneVerified' is only ever written here.
+app.post('/api/passenger/confirm-phone', rateLimit(60000, 10), async (req: Request, res: Response) => {
+  try {
+    const tokenUser = await verifyFirebaseIdToken(req);
+    if (!tokenUser) {
+      res.status(401).json({ success: false, error: 'Your session has expired. Please sign in again.' });
+      return;
+    }
+    const phone = readVerificationToken(String(req.body?.verificationToken || ''));
+    if (!phone) {
+      res.status(400).json({ success: false, error: 'Your phone verification has expired. Please verify your number again.' });
+      return;
+    }
+
+    await ensureBackendAuthenticated();
+    const passengerRef = doc(db, 'passengers', tokenUser.uid);
+    const passengerSnap = await getDoc(passengerRef);
+    if (!passengerSnap.exists()) {
+      res.status(404).json({ success: false, error: 'Passenger profile not found.' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    await runTransaction(db, async (tx) => {
+      const indexRef = doc(db, 'phoneIndex', phone);
+      const indexSnap = await tx.get(indexRef);
+      const owner = indexSnap.exists() ? indexSnap.data()?.uid : '';
+      if (owner && owner !== tokenUser.uid) {
+        throw new PhoneOtpError('This phone number is already registered to another ZAKA account.', 409);
+      }
+      if (!owner) {
+        tx.set(indexRef, { uid: tokenUser.uid, normalizedPhone: phone, createdAt: now, updatedAt: now }, { merge: true });
+      }
+      tx.update(passengerRef, { phone, phoneVerified: true, phoneVerifiedAt: now, updatedAt: now });
+    });
+
+    res.json({ success: true, phone, phoneVerifiedAt: now });
+  } catch (err: any) {
+    sendOtpError(res, err, 'We could not confirm your phone number. Please try again.');
   }
 });
 

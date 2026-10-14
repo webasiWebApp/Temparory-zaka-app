@@ -765,7 +765,7 @@ export const DriverPendingScreen: React.FC<DriverPendingScreenProps> = ({ embedd
           }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs"
         >
-          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-[20px] bg-white shadow-modal flex flex-col">
+          <div className="relative max-h-[90dvh] w-full max-w-2xl overflow-hidden rounded-[20px] bg-white shadow-modal flex flex-col">
             <div className="flex items-center justify-between border-b border-line p-4">
               <div>
                 <h3 className="text-sm font-bold text-ink">{previewDoc.title}</h3>

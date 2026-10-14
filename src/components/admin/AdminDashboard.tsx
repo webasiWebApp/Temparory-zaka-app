@@ -1729,7 +1729,7 @@ export const AdminDashboard: React.FC = () => {
       {/* MODAL 1: DRIVER COMPLIANCE & DOCUMENT INSPECTION */}
       {selectedDriverForReview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-[20px] bg-white p-6 shadow-modal border border-line space-y-5 my-8 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-[20px] bg-white p-6 shadow-modal border border-line space-y-5 my-8 max-h-[90dvh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-start justify-between border-b border-line pb-4">
               <div className="flex items-center gap-3">
@@ -2170,7 +2170,7 @@ export const AdminDashboard: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-modal"
+            className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-modal"
           >
             <div className="flex items-center justify-between border-b border-line p-5">
               <div>
@@ -2332,7 +2332,7 @@ export const AdminDashboard: React.FC = () => {
           }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-5"
         >
-          <div className="relative flex flex-col w-full max-w-4xl max-h-[92vh] overflow-hidden rounded-[20px] bg-white shadow-modal border border-line animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative flex flex-col w-full max-w-4xl max-h-[92dvh] overflow-hidden rounded-[20px] bg-white shadow-modal border border-line animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-neutral-50/80">
               <div className="flex items-center gap-3 min-w-0">

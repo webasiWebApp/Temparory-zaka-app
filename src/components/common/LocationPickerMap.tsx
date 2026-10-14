@@ -66,7 +66,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ value, onC
           renderingType="RASTER"
           defaultCenter={{ lat: start.latitude, lng: start.longitude }}
           defaultZoom={value ? 16 : 13}
-          gestureHandling="greedy"
+          // One finger scrolls the surrounding form (the picker sits inside scrolling dialogs); two fingers move the map.
+          // The pin itself can still be dragged with one finger.
+          gestureHandling="cooperative"
           disableDefaultUI={true}
           clickableIcons={false}
           className="h-full w-full"

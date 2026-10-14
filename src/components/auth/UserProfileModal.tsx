@@ -315,7 +315,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-[20px] border border-line bg-white shadow-modal overflow-hidden cursor-default"
+        className="flex max-h-full w-full max-w-lg flex-col rounded-[20px] border border-line bg-white shadow-modal overflow-hidden cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -501,7 +501,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                         onCancel={() => setChangingPhone(false)}
                         onVerified={async (verified) => {
                           await confirmVerifiedPhone(verified);
-                          setPhone(formatPhoneDisplay(verified));
+                          setPhone(formatPhoneDisplay(verified.phone));
                           setChangingPhone(false);
                           setSaveSuccess(true);
                           setTimeout(() => setSaveSuccess(false), 3000);

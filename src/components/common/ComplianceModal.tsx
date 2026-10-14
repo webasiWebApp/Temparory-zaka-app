@@ -39,7 +39,7 @@ export const ComplianceModal: React.FC<ComplianceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className="relative flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-[20px] border border-line bg-white shadow-modal"
+        className="relative flex flex-col w-full max-w-2xl max-h-[90dvh] overflow-hidden rounded-[20px] border border-line bg-white shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

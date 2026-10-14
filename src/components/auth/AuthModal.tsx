@@ -11,6 +11,9 @@ import { UserRole, VehicleType, ACTIVE_VEHICLE_TYPES } from '../../types';
 import { imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
 import { isRiderTarget } from '../../config/appTarget';
 import { validatePhoneNumber, formatPhoneDisplay } from '../../utils/phoneUtils';
+import { firestoreService } from '../../firebase/firestoreService';
+import type { VerifiedPhone } from '../../services/phoneVerificationService';
+import { PhoneOtpVerifier } from './PhoneOtpVerifier';
 import {
   X,
   User,
@@ -61,6 +64,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  // Passenger sign-up: the number confirmed by SMS code (required before the account is created)
+  const [verifiedPhone, setVerifiedPhone] = useState<VerifiedPhone | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -216,6 +221,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    if (role === 'passenger' && !verifiedPhone) {
+      setError('Please verify your phone number with the SMS code we send you.');
+      return;
+    }
+
     if (!cleanPhone) {
       setError('Please enter your phone number.');
       return;
@@ -238,12 +248,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: cleanEmail,
           pass: password,
           name: cleanName,
-          phone: cleanPhone,
+          phone: verifiedPhone!.phone,
           role: 'passenger',
+          phoneVerificationToken: verifiedPhone!.verificationToken,
         });
         setName('');
         setEmail('');
         setPhone('');
+        setVerifiedPhone(null);
         setPassword('');
         setConfirmPassword('');
         setError('');
@@ -307,7 +319,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col rounded-[20px] border border-line bg-white shadow-modal overflow-hidden">
+      <div className="flex max-h-[92dvh] w-full max-w-md flex-col rounded-[20px] border border-line bg-white shadow-modal overflow-hidden">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-line p-5">
           <div className="flex items-center gap-3">
@@ -770,32 +782,80 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-ink-2 mb-1">
-                      Phone Number (South Africa)
-                    </label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        onBlur={() => {
-                          if (!phone.trim()) return;
-                          const check = validatePhoneNumber(phone);
-                          if (check.valid) {
-                            setPhone(formatPhoneDisplay(check.normalized));
+                  {role === 'passenger' ? (
+                    verifiedPhone ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="block text-[11px] font-bold text-ink-2">Phone Number (South Africa)</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-success">
+                            <ShieldCheck className="h-3 w-3" />
+                            Verified
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="tel"
+                            aria-label="Verified phone number"
+                            value={formatPhoneDisplay(verifiedPhone.phone)}
+                            disabled
+                            className="w-full rounded-input border border-line bg-[#EEEEEE] py-2.5 px-3 text-xs text-ink-3 cursor-not-allowed"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setVerifiedPhone(null)}
+                            className="shrink-0 rounded-full border border-line px-3 py-2 text-[11px] font-bold text-ink-2 hover:bg-surface-2 cursor-pointer"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-card border border-line p-3">
+                        <PhoneOtpVerifier
+                          label="Phone Number (South Africa)"
+                          initialPhone={phone}
+                          beforeSend={async (normalized) => {
+                            const check = await firestoreService.checkPhoneRegistered(normalized);
+                            if (check.isRegistered && !check.isOwn) {
+                              throw new Error('This phone number is already registered with ZAKA. Please log in to your existing account.');
+                            }
+                          }}
+                          onVerified={(verified) => {
+                            setVerifiedPhone(verified);
+                            setPhone(formatPhoneDisplay(verified.phone));
                             setError('');
-                          } else {
-                            setError(check.error || 'Please enter a valid South African mobile number.');
-                          }
-                        }}
-                        placeholder="+27 82 123 4567"
-                        className="w-full rounded-input border border-line bg-surface-2 py-2.5 pl-9 pr-3 text-xs text-ink focus:border-primary focus:outline-none"
-                        required
-                      />
+                          }}
+                        />
+                      </div>
+                    )
+                  ) : (
+                    <div>
+                      <label className="block text-[11px] font-bold text-ink-2 mb-1">
+                        Phone Number (South Africa)
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          onBlur={() => {
+                            if (!phone.trim()) return;
+                            const check = validatePhoneNumber(phone);
+                            if (check.valid) {
+                              setPhone(formatPhoneDisplay(check.normalized));
+                              setError('');
+                            } else {
+                              setError(check.error || 'Please enter a valid South African mobile number.');
+                            }
+                          }}
+                          placeholder="+27 82 123 4567"
+                          className="w-full rounded-input border border-line bg-surface-2 py-2.5 pl-9 pr-3 text-xs text-ink focus:border-primary focus:outline-none"
+                          required
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div>
                     <label className="block text-[11px] font-bold text-ink-2 mb-1">

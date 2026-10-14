@@ -2,33 +2,39 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  * ZAKA E-Hailing Platform - Phone number verification by one-time SMS code
+ *
+ * Renders no <form> of its own so it can sit inside a larger form (e.g. passenger sign-up);
+ * Enter in either field triggers the current step instead of submitting the outer form.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Phone, ShieldCheck, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { phoneVerificationService } from '../../services/phoneVerificationService';
+import { phoneVerificationService, type VerifiedPhone } from '../../services/phoneVerificationService';
 import { validatePhoneNumber, formatPhoneDisplay } from '../../utils/phoneUtils';
 
 interface PhoneOtpVerifierProps {
   initialPhone?: string;
-  // Called with the confirmed number (canonical form). May reject to show an error.
-  onVerified: (phone: string) => Promise<void>;
+  label?: string;
+  // Called with the confirmed number (canonical form) and its verification token. May reject to show an error.
+  onVerified: (verified: VerifiedPhone) => Promise<void> | void;
+  // Optional pre-send check (e.g. the number is not registered to another account). Throw to block.
+  beforeSend?: (normalizedPhone: string) => Promise<void>;
   onCancel?: () => void;
 }
 
-const RESEND_SECONDS = 45;
-
-export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone = '', onVerified, onCancel }) => {
+export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({
+  initialPhone = '',
+  label = 'Mobile Number',
+  onVerified,
+  beforeSend,
+  onCancel,
+}) => {
   const [phone, setPhone] = useState(initialPhone);
   const [sentTo, setSentTo] = useState('');
-  const [verificationId, setVerificationId] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [resendIn, setResendIn] = useState(0);
-  const recaptchaRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => () => phoneVerificationService.dispose(), []);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -37,25 +43,20 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
   }, [resendIn]);
 
   const sendCode = async () => {
+    if (busy) return;
     setError('');
-    const check = validatePhoneNumber(phone);
+    const check = validatePhoneNumber(sentTo || phone);
     if (!check.valid) {
       setError(check.error || 'Please enter a valid mobile number.');
       return;
     }
     setBusy(true);
     try {
-      // Already confirmed on this account (e.g. the profile update was interrupted): no second SMS needed
-      if (phoneVerificationService.verifiedNumber() === check.normalized) {
-        await onVerified(check.normalized);
-        return;
-      }
-      if (!recaptchaRef.current) throw new Error('Please try again.');
-      const id = await phoneVerificationService.sendCode(check.normalized, recaptchaRef.current);
-      setVerificationId(id);
-      setSentTo(check.normalized);
+      if (beforeSend) await beforeSend(check.normalized);
+      const sent = await phoneVerificationService.sendCode(check.normalized);
+      setSentTo(sent.phone);
       setCode('');
-      setResendIn(RESEND_SECONDS);
+      setResendIn(sent.resendInSeconds);
     } catch (err: any) {
       setError(err?.message || 'We could not send the code. Please try again.');
     } finally {
@@ -63,8 +64,8 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
     }
   };
 
-  const confirmCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const confirmCode = async () => {
+    if (busy) return;
     setError('');
     if (!/^\d{6}$/.test(code.trim())) {
       setError('Please enter the 6-digit code from the SMS.');
@@ -72,12 +73,19 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
     }
     setBusy(true);
     try {
-      const verified = await phoneVerificationService.confirmCode(verificationId, code);
-      await onVerified(verified || sentTo);
+      const verified = await phoneVerificationService.confirmCode(sentTo, code);
+      await onVerified(verified);
     } catch (err: any) {
       setError(err?.message || 'We could not verify the code. Please try again.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onEnter = (action: () => void) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      action();
     }
   };
 
@@ -90,17 +98,11 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
         </div>
       )}
 
-      {!verificationId ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendCode();
-          }}
-          className="space-y-3"
-        >
+      {!sentTo ? (
+        <div className="space-y-3">
           <div>
             <label htmlFor="otp-phone-input" className="block text-xs font-bold text-ink mb-1">
-              Mobile Number
+              {label}
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
@@ -110,9 +112,9 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
                 autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={onEnter(sendCode)}
                 placeholder="+27 82 123 4567"
                 className="w-full rounded-input border border-line bg-surface-2 py-2.5 pl-9 pr-3 text-xs text-ink focus:border-primary focus:outline-none"
-                required
               />
             </div>
             <p className="mt-1 text-[11px] text-ink-3">We will send a 6-digit code by SMS to confirm this number is yours.</p>
@@ -129,16 +131,17 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
             )}
             <button
               id="btn-send-phone-code"
-              type="submit"
+              type="button"
+              onClick={sendCode}
               disabled={busy}
               className="flex-1 rounded-full bg-primary py-3 text-xs font-bold text-on-primary hover:bg-primary-hover active:bg-primary-pressed disabled:opacity-50 cursor-pointer"
             >
               {busy ? 'Sending code…' : 'Send Verification Code'}
             </button>
           </div>
-        </form>
+        </div>
       ) : (
-        <form onSubmit={confirmCode} className="space-y-3">
+        <div className="space-y-3">
           <div>
             <label htmlFor="otp-code-input" className="block text-xs font-bold text-ink mb-1">
               Enter the code sent to {formatPhoneDisplay(sentTo)}
@@ -151,6 +154,7 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={onEnter(confirmCode)}
               placeholder="••••••"
               className="w-full rounded-input border border-line bg-surface-2 p-3 text-center text-lg font-bold tracking-[0.5em] text-ink focus:border-primary focus:outline-none"
               autoFocus
@@ -158,7 +162,8 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
           </div>
           <button
             id="btn-confirm-phone-code"
-            type="submit"
+            type="button"
+            onClick={confirmCode}
             disabled={busy || code.length !== 6}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-xs font-bold text-on-primary hover:bg-primary-hover active:bg-primary-pressed disabled:opacity-50 cursor-pointer"
           >
@@ -169,7 +174,8 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
             <button
               type="button"
               onClick={() => {
-                setVerificationId('');
+                setSentTo('');
+                setCode('');
                 setError('');
               }}
               className="flex items-center gap-1 text-ink-2 hover:text-ink cursor-pointer"
@@ -186,11 +192,8 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({ initialPhone
               {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
             </button>
           </div>
-        </form>
+        </div>
       )}
-
-      {/* Host for the invisible reCAPTCHA Firebase requires before sending an SMS */}
-      <div ref={recaptchaRef} />
     </div>
   );
 };

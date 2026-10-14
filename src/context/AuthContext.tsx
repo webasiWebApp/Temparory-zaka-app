@@ -38,6 +38,7 @@ import { notificationService } from '../services/notificationService';
 import { onAppResume } from '../services/appLifecycleService';
 import { normalizePhoneNumber, validatePhoneNumber } from '../utils/phoneUtils';
 import { storageService } from '../firebase/storageService';
+import { phoneVerificationService, type VerifiedPhone } from '../services/phoneVerificationService';
 
 interface SignUpData {
   email: string;
@@ -47,6 +48,8 @@ interface SignUpData {
   role: UserRole;
   photoURL?: string;
   vehicle?: Omit<DriverVehicle, 'driverId'>;
+  // Passengers: proof that `phone` was confirmed by SMS code (see phoneVerificationService)
+  phoneVerificationToken?: string;
 }
 
 interface AuthContextType {
@@ -86,7 +89,7 @@ interface AuthContextType {
   // code NO_ZAKA_ACCOUNT so the user can choose Passenger or Driver first.
   signInWithGoogle: (preferredRole?: UserRole) => Promise<void>;
   signInWithApple: (preferredRole?: UserRole) => Promise<void>;
-  confirmVerifiedPhone: (verifiedPhone: string) => Promise<void>;
+  confirmVerifiedPhone: (verified: VerifiedPhone) => Promise<void>;
   deleteAccount: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfileData: (data: Partial<UserProfile>) => Promise<void>;
@@ -1263,6 +1266,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       if (data.role === 'passenger' || isRiderTarget) {
+        // Passengers must confirm their number by SMS code before an account is created
+        if (!data.phoneVerificationToken) {
+          throw new Error('Please verify your phone number with the SMS code before continuing.');
+        }
+
         // Step 1: Real Firebase Auth account
         const user = await registerPassengerAccount(data.email, data.pass, data.name);
 
@@ -1273,6 +1281,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: data.email,
           photoURL: data.photoURL,
         });
+
+        // Step 3: The server records the confirmed number. If this fails the account still works and
+        // the passenger is asked to verify the number again on the verification screen.
+        try {
+          const recorded = await phoneVerificationService.recordOnPassengerProfile(data.phoneVerificationToken);
+          setPassengerProfile((prev) =>
+            prev ? { ...prev, phone: recorded.phone, phoneVerified: true, phoneVerifiedAt: recorded.phoneVerifiedAt } : prev
+          );
+        } catch (phoneErr: any) {
+          console.warn('[ZAKA AUTH] registration:phone-confirmation', phoneErr?.message);
+        }
       } else if (data.role === 'driver') {
         const cleanEmail = data.email.trim().toLowerCase();
         const cleanName = data.name.trim();
@@ -1479,17 +1498,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Records a number the user has just confirmed by SMS code (see phoneVerificationService) on their
-   * profile. The security rules only accept phoneVerified for the number held in the session token.
+   * profile. 'phoneVerified' itself is written only by the server, after it checks the token.
    */
-  const confirmVerifiedPhone = async (verifiedPhone: string) => {
+  const confirmVerifiedPhone = async ({ phone: verifiedPhone, verificationToken }: VerifiedPhone) => {
     const phone = normalizePhoneNumber(verifiedPhone);
     if (!phone) throw new Error('We could not confirm your phone number. Please try again.');
+    // Reserves the number in phoneIndex for this account (and releases the previous one)
     await updateUserProfileData({ phone });
-    await updatePassengerProfileData({
-      phone,
-      phoneVerified: true,
-      phoneVerifiedAt: new Date().toISOString(),
-    });
+    if (!passengerProfile?.userId) return;
+    const recorded = await phoneVerificationService.recordOnPassengerProfile(verificationToken);
+    setPassengerProfile((prev) =>
+      prev
+        ? { ...prev, phone: recorded.phone, phoneVerified: true, phoneVerifiedAt: recorded.phoneVerifiedAt, updatedAt: recorded.phoneVerifiedAt }
+        : prev
+    );
   };
 
   const updateDriverProfileData = async (data: Partial<DriverProfile>) => {

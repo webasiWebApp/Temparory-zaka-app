@@ -91,7 +91,7 @@ export const BecomeDriverModal: React.FC<BecomeDriverModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[20px] border border-white/80 bg-white p-6 sm:p-8 shadow-modal animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-[20px] border border-white/80 bg-white p-6 sm:p-8 shadow-modal animate-in fade-in zoom-in-95 duration-200">
         {/* Close Button */}
         <button
           type="button"
