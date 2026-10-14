@@ -33,7 +33,7 @@ import { firestoreService } from '../../firebase/firestoreService';
 import { isRiderTarget } from '../../config/appTarget';
 import { maskIdNumber } from '../../utils/identityUtils';
 import { apiFetch } from '../../services/apiClient';
-import { validatePhoneNumber as validateZakaPhone, formatPhoneDisplay, normalizePhoneNumber } from '../../utils/phoneUtils';
+import { validatePhoneNumber as validateZakaPhone, formatPhoneDisplay, normalizePhoneNumber, filterSaPhoneInput } from '../../utils/phoneUtils';
 import { ownPhotoURL, imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
 import { SavedPlacesEditor } from '../passenger/SavedPlacesEditor';
 import { PhoneOtpVerifier } from './PhoneOtpVerifier';
@@ -541,7 +541,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                     id="profile-phone"
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone((prev) => filterSaPhoneInput(e.target.value, prev))}
                     disabled={driverPhoneLocked}
                     className={`w-full rounded-input border border-line p-3 text-xs focus:border-primary focus:outline-none ${
                       driverPhoneLocked ? 'bg-[#EEEEEE] text-ink-3 cursor-not-allowed' : 'bg-surface-2 text-ink'

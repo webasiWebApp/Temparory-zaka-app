@@ -10,7 +10,7 @@ import { useAuth, NO_ZAKA_ACCOUNT } from '../../context/AuthContext';
 import { UserRole, VehicleType, ACTIVE_VEHICLE_TYPES } from '../../types';
 import { imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
 import { isRiderTarget } from '../../config/appTarget';
-import { validatePhoneNumber, formatPhoneDisplay } from '../../utils/phoneUtils';
+import { validatePhoneNumber, formatPhoneDisplay, filterSaPhoneInput } from '../../utils/phoneUtils';
 import { firestoreService } from '../../firebase/firestoreService';
 import type { VerifiedPhone } from '../../services/phoneVerificationService';
 import { PhoneOtpVerifier } from './PhoneOtpVerifier';
@@ -838,7 +838,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <input
                           type="tel"
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          onChange={(e) => setPhone((prev) => filterSaPhoneInput(e.target.value, prev))}
                           onBlur={() => {
                             if (!phone.trim()) return;
                             const check = validatePhoneNumber(phone);
