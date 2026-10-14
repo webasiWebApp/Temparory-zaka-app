@@ -68,7 +68,27 @@ export function normalizePhoneNumber(raw: string): string {
 }
 
 /**
- * Validates whether a phone number can be normalized into a valid South African or international mobile number.
+ * Filters phone input keystrokes so only South African (+27) numbers can be typed.
+ * Keeps digits, spaces and a single leading '+'; a typed country code must be +27 / 0027.
+ * Returns `previous` unchanged when the new value would be a non-South African number.
+ */
+export function filterSaPhoneInput(next: string, previous: string): string {
+  const cleaned = next.replace(/[^\d+ ]/g, '').replace(/(?!^)\+/g, '');
+  const digits = cleaned.replace(/\D/g, '');
+
+  // '+' must lead into 27 ('+', '+2' are allowed while typing)
+  if (cleaned.startsWith('+') && !digits.startsWith('27') && !'27'.startsWith(digits)) return previous;
+  // International '00' prefix must lead into 0027
+  if (digits.startsWith('00') && !digits.startsWith('0027') && !'0027'.startsWith(digits)) return previous;
+
+  // Longest valid form is 0027 + 9 digits
+  if (digits.length > 13) return previous;
+
+  return cleaned;
+}
+
+/**
+ * Validates whether a phone number can be normalized into a valid South African (+27) number.
  */
 export function validatePhoneNumber(raw: string): {
   valid: boolean;
@@ -85,14 +105,11 @@ export function validatePhoneNumber(raw: string): {
 
   const normalized = normalizePhoneNumber(raw);
 
-  // South African standard: +27 followed by 9 digits (total length: 12 chars)
+  // Only South African numbers are accepted: +27 followed by 9 digits (total length: 12 chars)
   // Common mobile prefixes: 06x, 07x, 08x, landlines: 01x, 02x, etc.
   const isSouthAfrican = /^\+27[1-9]\d{8}$/.test(normalized);
 
-  // Generic international E.164: + followed by 8 to 15 digits
-  const isInternational = /^\+[1-9]\d{7,14}$/.test(normalized);
-
-  if (!isSouthAfrican && !isInternational) {
+  if (!isSouthAfrican) {
     return {
       valid: false,
       normalized,

@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build",
+    "dev": "node api.js && tsx server.ts",
+    "build": "node api.js && vite build",
     "build:web": "VITE_APP_TARGET=web vite build",
     "build:rider-ios": "VITE_APP_TARGET=rider-ios vite build && npx cap sync ios",
     "cap:sync": "npx cap sync ios",
-    "start": "NODE_ENV=production tsx server.ts",
+    "start": "node api.js && NODE_ENV=production tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit && tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --target es2022 --lib es2022,dom --strict --resolveJsonModule --types node server.ts"

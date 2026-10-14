@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { Phone, ShieldCheck, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { phoneVerificationService, type VerifiedPhone } from '../../services/phoneVerificationService';
-import { validatePhoneNumber, formatPhoneDisplay } from '../../utils/phoneUtils';
+import { validatePhoneNumber, formatPhoneDisplay, filterSaPhoneInput } from '../../utils/phoneUtils';
 
 interface PhoneOtpVerifierProps {
   initialPhone?: string;
@@ -111,7 +111,7 @@ export const PhoneOtpVerifier: React.FC<PhoneOtpVerifierProps> = ({
                 type="tel"
                 autoComplete="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone((prev) => filterSaPhoneInput(e.target.value, prev))}
                 onKeyDown={onEnter(sendCode)}
                 placeholder="+27 82 123 4567"
                 className="w-full rounded-input border border-line bg-surface-2 py-2.5 pl-9 pr-3 text-xs text-ink focus:border-primary focus:outline-none"
