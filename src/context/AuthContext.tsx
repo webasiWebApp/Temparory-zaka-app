@@ -33,7 +33,7 @@ import {
   DriverVehicle,
 } from '../types';
 import { DEMO_PERSONAS } from '../data/demoPersonas';
-import { isRiderTarget } from '../config/appTarget';
+import { isRiderTarget, BYPASS_PASSENGER_VERIFICATION } from '../config/appTarget';
 import { notificationService } from '../services/notificationService';
 import { onAppResume } from '../services/appLifecycleService';
 import { normalizePhoneNumber, validatePhoneNumber } from '../utils/phoneUtils';
@@ -1267,7 +1267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (data.role === 'passenger' || isRiderTarget) {
         // Passengers must confirm their number by SMS code before an account is created
-        if (!data.phoneVerificationToken) {
+        if (!data.phoneVerificationToken && !BYPASS_PASSENGER_VERIFICATION) {
           throw new Error('Please verify your phone number with the SMS code before continuing.');
         }
 
@@ -1285,6 +1285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Step 3: The server records the confirmed number. If this fails the account still works and
         // the passenger is asked to verify the number again on the verification screen.
         try {
+          if (!data.phoneVerificationToken) throw new Error('phone not verified (bypassed)');
           const recorded = await phoneVerificationService.recordOnPassengerProfile(data.phoneVerificationToken);
           setPassengerProfile((prev) =>
             prev ? { ...prev, phone: recorded.phone, phoneVerified: true, phoneVerifiedAt: recorded.phoneVerifiedAt } : prev

@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { VehicleType, ACTIVE_VEHICLE_TYPES, DriverPrivateDetails } from '../../types';
 import { firestoreService } from '../../firebase/firestoreService';
-import { isRiderTarget } from '../../config/appTarget';
+import { isRiderTarget, BYPASS_PASSENGER_VERIFICATION } from '../../config/appTarget';
 import { maskIdNumber } from '../../utils/identityUtils';
 import { apiFetch } from '../../services/apiClient';
 import { validatePhoneNumber as validateZakaPhone, formatPhoneDisplay, normalizePhoneNumber, filterSaPhoneInput } from '../../utils/phoneUtils';
@@ -517,6 +517,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                         disabled
                         className="w-full rounded-input border border-line bg-[#EEEEEE] p-3 text-xs text-ink-3 cursor-not-allowed"
                       />
+                      {!BYPASS_PASSENGER_VERIFICATION && (
                       <button
                         id="btn-change-phone"
                         type="button"
@@ -528,9 +529,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                       >
                         {phone ? 'Change' : 'Add'}
                       </button>
+                      )}
                     </div>
                   )}
-                  <p className="mt-1 text-[11px] text-ink-3">A new number is confirmed with a code sent by SMS.</p>
+                  {!BYPASS_PASSENGER_VERIFICATION && (
+                    <p className="mt-1 text-[11px] text-ink-3">A new number is confirmed with a code sent by SMS.</p>
+                  )}
                 </div>
               ) : (
                 <div>

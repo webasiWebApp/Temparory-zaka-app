@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { useAuth, NO_ZAKA_ACCOUNT } from '../../context/AuthContext';
 import { UserRole, VehicleType, ACTIVE_VEHICLE_TYPES } from '../../types';
 import { imageToAvatarDataUrl, validateImageFile } from '../../utils/imageUtils';
-import { isRiderTarget } from '../../config/appTarget';
+import { isRiderTarget, BYPASS_PASSENGER_VERIFICATION } from '../../config/appTarget';
 import { validatePhoneNumber, formatPhoneDisplay, filterSaPhoneInput } from '../../utils/phoneUtils';
 import { firestoreService } from '../../firebase/firestoreService';
 import type { VerifiedPhone } from '../../services/phoneVerificationService';
@@ -221,7 +221,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (role === 'passenger' && !verifiedPhone) {
+    if (role === 'passenger' && !BYPASS_PASSENGER_VERIFICATION && !verifiedPhone) {
       setError('Please verify your phone number with the SMS code we send you.');
       return;
     }
@@ -248,9 +248,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: cleanEmail,
           pass: password,
           name: cleanName,
-          phone: verifiedPhone!.phone,
+          phone: verifiedPhone?.phone ?? cleanPhone,
           role: 'passenger',
-          phoneVerificationToken: verifiedPhone!.verificationToken,
+          phoneVerificationToken: verifiedPhone?.verificationToken,
         });
         setName('');
         setEmail('');
@@ -782,7 +782,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
                   </div>
 
-                  {role === 'passenger' ? (
+                  {role === 'passenger' && !BYPASS_PASSENGER_VERIFICATION ? (
                     verifiedPhone ? (
                       <div>
                         <div className="flex items-center justify-between mb-1">
