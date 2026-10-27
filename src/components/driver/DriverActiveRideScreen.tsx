@@ -13,6 +13,7 @@ import React, { useState } from 'react';
 import { RideDocument } from '../../types';
 import { fareService } from '../../services/fareService';
 import { firestoreService } from '../../firebase/firestoreService';
+import { HIDE_RIDE_OTP_UI } from '../../config/appTarget';
 import {
   Car,
   MapPin,
@@ -358,6 +359,7 @@ export const DriverActiveRideScreen: React.FC<DriverActiveRideScreenProps> = ({
       {/* Step 3: When 'driver_arrived' -> Safety PIN & Start Ride */}
       {ride.status === 'driver_arrived' && (
         <div className="space-y-3 rounded-card border border-amber-200 bg-amber-50/70 p-4">
+          {!HIDE_RIDE_OTP_UI && (
           <div>
             <label className="block text-xs font-bold text-amber-950 mb-1.5">
               Enter Passenger Safety PIN (4-Digits):
@@ -373,6 +375,7 @@ export const DriverActiveRideScreen: React.FC<DriverActiveRideScreenProps> = ({
             />
             {pinError && <p className="mt-1 text-xs font-bold text-danger">{pinError}</p>}
           </div>
+          )}
 
           <button
             id="btn-start-ride"

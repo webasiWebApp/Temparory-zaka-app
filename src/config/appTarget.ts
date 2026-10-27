@@ -27,3 +27,6 @@ export const isWebTarget = APP_TARGET === 'web';
  */
 const bypassEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BYPASS_PASSENGER_VERIFICATION) || 'true';
 export const BYPASS_PASSENGER_VERIFICATION = String(bypassEnv).trim().toLowerCase() !== 'false';
+
+/** UI only: hides the ride safety PIN (OTP) badge and entry box. The PIN logic and rules are untouched. */
+export const HIDE_RIDE_OTP_UI = BYPASS_PASSENGER_VERIFICATION;

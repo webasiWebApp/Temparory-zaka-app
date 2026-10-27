@@ -10,6 +10,7 @@ import React, { useState, useEffect } from 'react';
 import { RideDocument } from '../../types';
 import { fareService } from '../../services/fareService';
 import { firestoreService } from '../../firebase/firestoreService';
+import { HIDE_RIDE_OTP_UI } from '../../config/appTarget';
 import {
   Car,
   Star,
@@ -296,6 +297,7 @@ export const ActiveRidePanel: React.FC<ActiveRidePanelProps> = ({
             </div>
 
             {/* Safety PIN Badge */}
+            {!HIDE_RIDE_OTP_UI && (
             <div className="mt-3.5 flex items-center justify-between rounded-card bg-amber-50/80 border border-amber-200/80 px-3.5 py-2.5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4.5 w-4.5 text-amber-900 shrink-0" />
@@ -309,6 +311,7 @@ export const ActiveRidePanel: React.FC<ActiveRidePanelProps> = ({
                 {safetyPin || '••••'}
               </div>
             </div>
+            )}
           </div>
 
           {/* Quick Communication & Safety Actions (Floating Circular Action Buttons) */}
