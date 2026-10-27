@@ -19,3 +19,11 @@ export const APP_TARGET: AppTarget =
 export const isRiderTarget = APP_TARGET === 'rider-ios';
 export const isDriverTarget = APP_TARGET === 'driver-ios';
 export const isWebTarget = APP_TARGET === 'web';
+
+/**
+ * Temporary switch: when true, passengers skip the identity verification screen (phone code, ID, live photo).
+ * Nothing is removed - set to false (or VITE_BYPASS_PASSENGER_VERIFICATION=false) to enforce it again.
+ * Client-side only: firestore.rules still require an approved passenger to book until the rules are relaxed.
+ */
+const bypassEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_BYPASS_PASSENGER_VERIFICATION) || 'true';
+export const BYPASS_PASSENGER_VERIFICATION = String(bypassEnv).trim().toLowerCase() !== 'false';

@@ -19,7 +19,7 @@ import { PassengerVerificationScreen } from './components/passenger/PassengerVer
 import { onGoHome } from './utils/appEvents';
 import { DemoTestBanner } from './components/demo/DemoTestBanner';
 import { UserRole } from './types';
-import { isRiderTarget } from './config/appTarget';
+import { isRiderTarget, BYPASS_PASSENGER_VERIFICATION } from './config/appTarget';
 
 const AppContent: React.FC = () => {
   const { currentUser, userProfile, passengerProfile, activeRole, roles, isAdmin, isDemoTestMode, loading, isEmailVerified } = useAuth();
@@ -97,6 +97,7 @@ const AppContent: React.FC = () => {
   // Admin and isolated demo sessions are exempt.
   const needsPassengerVerification =
     isAuthenticated &&
+    !BYPASS_PASSENGER_VERIFICATION &&
     !showAdminView &&
     !showDriverView &&
     !isAdmin &&
